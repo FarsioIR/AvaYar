@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Ava — تبدیل متن به تجربه شنیداری فارسی"
+    />
+    <title>Ava — Farsio</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">Farsio / Ava</p>
+        <h1>متن را بده؛ فارسی گوش کن.</h1>
+        <p class="lede">
+          پایه اجرایی Ava: متن فارسی، حالت کامل یا خلاصه، انتخاب صدای ترجیحی،
+          کنترل سرعت و پخش مرورگر.
+        </p>
+      </header>
+
+      <section class="card" aria-labelledby="input-title">
+        <div class="section-heading">
+          <h2 id="input-title">متن</h2>
+          <span id="languageBadge" class="badge">زبان: —</span>
+        </div>
+
+        <label class="field">
+          <span>متن ورودی</span>
+          <textarea
+            id="sourceText"
+            rows="12"
+            placeholder="متن فارسی را اینجا وارد کنید…"
+          ></textarea>
+        </label>
+
+        <div class="grid two">
+          <label class="field">
+            <span>حالت شنیدن</span>
+            <select id="mode">
+              <option value="full">متن کامل</option>
+              <option value="summary">خلاصه</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>صدای ترجیحی</span>
+            <select id="voicePreference">
+              <option value="female">زن</option>
+              <option value="male">مرد</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>سرعت پخش: <strong id="rateValue">1.0×</strong></span>
+          <input id="rate" type="range" min="0.6" max="1.8" value="1" step="0.1" />
+        </label>
+
+        <div class="actions">
+          <button id="prepareButton" class="primary" type="button">آماده‌سازی</button>
+          <button id="playButton" type="button" disabled>پخش</button>
+          <button id="pauseButton" type="button" disabled>مکث</button>
+          <button id="resumeButton" type="button" disabled>ادامه</button>
+          <button id="stopButton" type="button" disabled>توقف</button>
+        </div>
+
+        <p id="status" class="status" role="status">آماده برای دریافت متن فارسی.</p>
+      </section>
+
+      <section class="card" aria-labelledby="output-title">
+        <div class="section-heading">
+          <h2 id="output-title">خروجی شنیداری</h2>
+          <span id="voiceBadge" class="badge">صدا: —</span>
+        </div>
+        <div id="outputText" class="output empty">هنوز خروجی آماده نشده است.</div>
+      </section>
+
+      <section class="notice">
+        <strong>مرز M2:</strong>
+        متن فارسی همین حالا قابل آماده‌سازی و پخش است. برای متن غیر فارسی،
+        Ava عمداً خطای واضح «provider ترجمه تنظیم نشده» می‌دهد. تضمین صدای
+        واقعی زن/مرد نیز به provider تولید گفتار در milestone بعدی متصل می‌شود؛
+        Web Speech API مرورگر اطلاعات جنسیت صدا را استاندارد نمی‌کند.
+      </section>
+    </main>
+
+    <script type="module" src="/src/app.mjs"></script>
+  </body>
+</html>
