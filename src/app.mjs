@@ -1,6 +1,6 @@
 import { prepareListening } from "./core/pipeline.mjs";
-import { createBrowserSpeaker } from "./providers/browser-speech.mjs";
-import { UnconfiguredTranslationProvider } from "./providers/unconfigured-translation.mjs";
+import { ServerTranslationProvider } from "./providers/server-translation.mjs";
+import { createServerSpeaker } from "./providers/server-speech.mjs";
 
 const elements = {
   sourceText: document.querySelector("#sourceText"),
@@ -16,12 +16,14 @@ const elements = {
   status: document.querySelector("#status"),
   outputText: document.querySelector("#outputText"),
   languageBadge: document.querySelector("#languageBadge"),
-  voiceBadge: document.querySelector("#voiceBadge")
+  voiceBadge: document.querySelector("#voiceBadge"),
+  providerBadge: document.querySelector("#providerBadge")
 };
 
-const translator = new UnconfiguredTranslationProvider();
-const speaker = createBrowserSpeaker();
+const translator = new ServerTranslationProvider();
+const speaker = createServerSpeaker();
 let prepared = null;
+let capabilities = null;
 
 function setStatus(message, isError = false) {
   elements.status.textContent = message;
@@ -35,6 +37,19 @@ function setPlaybackEnabled(enabled) {
   elements.stopButton.disabled = !enabled;
 }
 
+async function loadCapabilities() {
+  try {
+    const response = await fetch("/api/capabilities");
+    capabilities = await response.json();
+
+    const translation = capabilities.translationConfigured ? "ترجمه ✓" : "ترجمه —";
+    const speech = capabilities.speechConfigured ? "صدا ✓" : "صدا —";
+    elements.providerBadge.textContent = `Azure: ${translation} / ${speech}`;
+  } catch {
+    elements.providerBadge.textContent = "Azure: وضعیت نامشخص";
+  }
+}
+
 function renderPrepared(result) {
   prepared = result;
   elements.outputText.textContent = result.listeningText;
@@ -42,11 +57,15 @@ function renderPrepared(result) {
   elements.languageBadge.textContent =
     result.sourceLanguage === "fa"
       ? `زبان: فارسی (${result.languageConfidence})`
-      : `زبان: غیر فارسی (${result.languageConfidence})`;
-  setPlaybackEnabled(true);
+      : `زبان: ترجمه‌شده به فارسی (${result.languageConfidence})`;
+  setPlaybackEnabled(Boolean(capabilities?.speechConfigured));
 
   const modeLabel = result.mode === "summary" ? "خلاصه" : "کامل";
-  setStatus(`خروجی ${modeLabel} آماده است.`);
+  setStatus(
+    capabilities?.speechConfigured
+      ? `خروجی ${modeLabel} آماده پخش است.`
+      : `خروجی ${modeLabel} آماده است؛ Azure Speech هنوز تنظیم نشده است.`
+  );
 }
 
 async function prepare() {
@@ -73,24 +92,24 @@ async function prepare() {
 
 elements.prepareButton.addEventListener("click", prepare);
 
-elements.playButton.addEventListener("click", () => {
+elements.playButton.addEventListener("click", async () => {
   if (!prepared) {
     return;
   }
 
+  setStatus("در حال ساخت صدای فارسی…");
+
   try {
-    const result = speaker.speak({
+    const result = await speaker.speak({
       text: prepared.listeningText,
       rate: Number(elements.rate.value),
       voicePreference: elements.voicePreference.value
     });
 
-    elements.voiceBadge.textContent = `صدا: ${result.voiceName}`;
-    setStatus(
-      result.exactGenderGuaranteed
-        ? "پخش شروع شد."
-        : "پخش شروع شد؛ جنسیت صدای مرورگر تضمین‌شده نیست."
-    );
+    elements.voiceBadge.textContent =
+      `صدا: ${result.voiceName} / ${result.voiceGender}`;
+
+    setStatus("پخش با صدای فارسی Azure شروع شد.");
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error), true);
   }
@@ -101,8 +120,8 @@ elements.pauseButton.addEventListener("click", () => {
   setStatus("پخش متوقف موقت شد.");
 });
 
-elements.resumeButton.addEventListener("click", () => {
-  speaker.resume();
+elements.resumeButton.addEventListener("click", async () => {
+  await speaker.resume();
   setStatus("پخش ادامه یافت.");
 });
 
@@ -112,11 +131,13 @@ elements.stopButton.addEventListener("click", () => {
 });
 
 elements.rate.addEventListener("input", () => {
-  elements.rateValue.textContent = `${Number(elements.rate.value).toFixed(1)}×`;
+  const rate = Number(elements.rate.value);
+  elements.rateValue.textContent = `${rate.toFixed(1)}×`;
+  speaker.setRate(rate);
 });
 
 elements.sourceText.value =
-  "آوا به شما کمک می‌کند متن‌های فارسی را به تجربه شنیداری تبدیل کنید. " +
-  "در این نسخه پایه، متن فارسی می‌تواند به شکل کامل یا خلاصه آماده شود. " +
-  "کنترل سرعت پخش و انتخاب صدای ترجیحی نیز در رابط کاربری وجود دارد. " +
-  "اتصال ترجمه و صدای تضمین‌شده زن و مرد در milestone بعدی انجام می‌شود.";
+  "Ava can now translate non-Persian text to Persian through Azure Translator. " +
+  "It can also synthesize Persian speech using explicit female and male Azure voices.";
+
+await loadCapabilities();

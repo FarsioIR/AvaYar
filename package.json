@@ -1,6 +1,6 @@
 {
   "name": "ava-farsio-runtime",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Executable foundation for Ava, a Farsio product.",
@@ -13,6 +13,7 @@
     "test": "node --test",
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "check": "npm run lint && npm test && npm run build && npm run smoke"
+    "check": "npm run lint && npm test && npm run build && npm run smoke",
+    "live:azure": "node scripts/live-azure-probe.mjs"
   }
 }
