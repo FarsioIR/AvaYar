@@ -1,5 +1,10 @@
 # AvaYar · آوایار
 
+<!-- farsio-product-logo:v1 -->
+<p align="center">
+  <img src="./assets/brand/avayar-mark.png" alt="AvaYar · آوایار" width="180" />
+</p>
+
 <!-- farsio-brand:v1 -->
 **Persian Reading & Listening Assistant by Farsio**
 
@@ -9,7 +14,7 @@ Persian-first web reading, translation and text-to-speech experience.
 
 ---
 
-**آوا** یک محصول در مرحله Discovery از خانواده محصولات **FarsiSmart.ir** است.
+**آوایار** یک محصول در مرحله Discovery از خانواده **Farsio - فارسیو** است.
 
 هدف محصول، کمک به فارسی‌زبانان برای استخراج محتوای اصلی صفحات وب، ترجمه یا خلاصه‌سازی آن و مصرف صوتی خروجی فارسی است.
 
