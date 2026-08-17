@@ -1,4 +1,13 @@
-# آوا — FarsiSmart Listen
+# AvaYar · آوایار
+
+<!-- farsio-brand:v1 -->
+**Persian Reading & Listening Assistant by Farsio**
+
+Persian-first web reading, translation and text-to-speech experience.
+
+**بشنو، به فارسی**
+
+---
 
 **آوا** یک محصول در مرحله Discovery از خانواده محصولات **FarsiSmart.ir** است.
 
@@ -45,3 +54,5 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Product.ps1
 - دسترسی‌های افزونه باید حداقلی و مستند باشند.
 - پردازش محتوای صفحه توسط سرویس ثالث نیازمند رضایت و Privacy disclosure است.
 - هیچ ادعای بازار، عملکرد یا درآمد تا زمان داشتن شواهد به‌عنوان واقعیت منتشر نمی‌شود.
+
+Repository: https://github.com/FarsioIR/AvaYar
