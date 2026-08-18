@@ -137,7 +137,7 @@ elements.rate.addEventListener("input", () => {
 });
 
 elements.sourceText.value =
-  "Ava can now translate non-Persian text to Persian through Azure Translator. " +
+  "AvaYar can translate non-Persian text to Persian through Azure Translator. " +
   "It can also synthesize Persian speech using explicit female and male Azure voices.";
 
 await loadCapabilities();

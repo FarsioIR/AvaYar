@@ -1,5 +1,12 @@
+node_modules/
+dist/
+coverage/
 .env
 .env.*
 !.env.example
-dist/
+*.log
 *.mp3
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

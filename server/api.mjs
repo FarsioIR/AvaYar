@@ -83,8 +83,8 @@ export function createApiHandler({
         response.writeHead(200, {
           "content-type": result.contentType,
           "cache-control": "no-store",
-          "x-ava-voice-name": result.voice.name,
-          "x-ava-voice-gender": result.voice.gender
+          "x-avayar-voice-name": result.voice.name,
+          "x-avayar-voice-gender": result.voice.gender
         });
         response.end(result.audio);
         return true;

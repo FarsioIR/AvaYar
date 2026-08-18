@@ -1,4 +1,4 @@
-# Ava M3 — MVP Status
+# AvaYar M3 — MVP Status
 
 | Capability | M3 state before live gate |
 |---|---|

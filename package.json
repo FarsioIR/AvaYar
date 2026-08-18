@@ -1,9 +1,9 @@
 {
-  "name": "ava-farsio-runtime",
+  "name": "avayar-farsio-runtime",
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Executable foundation for Ava, a Farsio product.",
+  "description": "Executable foundation for AvaYar, a Farsio product.",
   "engines": {
     "node": ">=22"
   },

@@ -21,7 +21,7 @@ const translator = new AzureTranslator(config.translator);
 const speech = new AzureSpeechSynthesizer(config.speech);
 
 const translated = await translator.translateToPersian(
-  "Ava converts useful text into a Persian listening experience."
+  "AvaYar converts useful text into a Persian listening experience."
 );
 
 if (!/[\u0600-\u06ff]/u.test(translated)) {

@@ -1,4 +1,4 @@
-# Ava M3 — Azure Provider Architecture
+# AvaYar M3 — Azure Provider Architecture
 
 ## Decision
 

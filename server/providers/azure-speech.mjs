@@ -75,7 +75,7 @@ export class AzureSpeechSynthesizer {
         "Ocp-Apim-Subscription-Key": this.key,
         "Content-Type": "application/ssml+xml",
         "X-Microsoft-OutputFormat": this.outputFormat,
-        "User-Agent": "Ava-Farsio"
+        "User-Agent": "AvaYar-Farsio"
       },
       body: ssml
     });

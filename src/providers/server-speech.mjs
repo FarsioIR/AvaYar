@@ -46,12 +46,12 @@ export function createServerSpeaker({
 
       return {
         voiceName:
-          response.headers.get("x-ava-voice-name") ??
+          response.headers.get("x-avayar-voice-name") ??
           (voicePreference === "female"
             ? "fa-IR-DilaraNeural"
             : "fa-IR-FaridNeural"),
         voiceGender:
-          response.headers.get("x-ava-voice-gender") ??
+          response.headers.get("x-avayar-voice-gender") ??
           (voicePreference === "female" ? "Female" : "Male"),
         exactGenderGuaranteed: true
       };
