@@ -1,54 +1,68 @@
-# M0 Product Intake
+# M0 Product Intake — Historical Baseline
 
-## تصمیم
+> This document records the original M0 intake decision. It is a historical product baseline, not the current repository-status page.
+>
+> Current engineering status: **M2 — executable foundation**. See [`docs/ava/m2/MVP_STATUS.md`](./ava/m2/MVP_STATUS.md).
+
+## Current context
+
+```text
+PARENT-BRAND: Farsio - فارسیو
+PRODUCT: AvaYar · آوایار
+PRODUCT-STATUS: DISCOVERY / PRE-MVP
+ENGINEERING-MILESTONE: M2 EXECUTABLE FOUNDATION
+REPOSITORY: PUBLIC
+PUBLIC-PRODUCT-RELEASE: NOT YET
+PRODUCTION: NOT LAUNCHED
+```
+
+## Historical M0 decision
 
 ```text
 PORTFOLIO-INTAKE: APPROVED
-PARENT-BRAND: FarsiSmart.ir
-PRODUCT: آوا | Ava — FarsiSmart Listen
 PRODUCT-STATUS: DISCOVERY / PRE-MVP
-CODE-STATUS: NOT BUILDABLE AS PROVIDED
-REPOSITORY: PRIVATE
-PUBLICATION: BLOCKED
-PRODUCTION: BLOCKED
+INITIAL-BLUEPRINT-CODE-STATUS: NOT BUILDABLE AS PROVIDED
+M0-PUBLICATION: BLOCKED
+M0-PRODUCTION: BLOCKED
 ```
 
-## مسئله
+The `NOT BUILDABLE AS PROVIDED` statement above refers to the **initial M0 blueprint input**. It does not describe the current repository: M1 and M2 work later established an executable runtime foundation, validation tooling and documented architecture.
 
-کاربران فارسی‌زبان برای مصرف حجم زیاد محتوای وب با محدودیت زمان، زبان و کیفیت ابزارهای صوتی روبه‌رو هستند.
+## Problem
 
-## فرضیه ارزش
+Persian-speaking users can face time, language and audio-quality friction when consuming large amounts of web content.
 
-یک افزونه مرورگر می‌تواند محتوای اصلی صفحه را استخراج کند، در صورت نیاز ترجمه یا خلاصه کند و خروجی فارسی را به صوت تبدیل کند.
+## Value hypothesis
 
-## MVP پیشنهادی
+A browser-oriented product can extract the main content of a page, translate or summarize it when needed, and turn the Persian output into a listening experience.
 
-- استخراج محتوای اصلی صفحه
-- ترجمه مفهومی به فارسی
-- خلاصه‌سازی در چند قالب محدود و آزمایش‌پذیر
-- پخش صوت فارسی
-- رابط Side Panel
-- کنترل Play، Pause، Stop و Speed
-- تنظیم شفاف Provider
-- رضایت کاربر پیش از ارسال محتوای صفحه به سرویس ثالث
+## Proposed MVP capabilities
 
-## خارج از محدوده M0
+- Main-content extraction.
+- Meaning-preserving translation into Persian.
+- Limited and testable summarization modes.
+- Persian speech playback.
+- Clear playback controls: play, pause, resume, stop and speed.
+- Explicit provider configuration.
+- User consent before sending webpage content to a third-party provider.
 
-- پرداخت
-- entitlement تجاری
-- Chrome Web Store
-- انتشار عمومی
-- DNS
-- Production
-- API عمومی
-- اپ موبایل
-- Voice cloning
+## Original M0 out-of-scope items
 
-## معیار خروج از M0
+- Payments.
+- Commercial entitlement.
+- Public Browser Store publication.
+- Production deployment.
+- Public API.
+- Mobile application.
+- Voice cloning.
 
-- معماری Manifest V3 و bundling تصویب شده باشد.
-- Provider رسمی TTS و شرایط استفاده آن مشخص باشد.
-- Threat model ثبت شده باشد.
-- Permissionها حداقل‌سازی شده باشند.
-- Privacy flow و پردازشگرهای ثالث مشخص باشند.
-- Inventory فایل‌های لازم برای M1 کامل باشد.
+## Historical M0 exit criteria
+
+- Manifest V3 architecture and bundling decisions recorded.
+- Official TTS/provider choices and terms reviewed.
+- Threat model recorded.
+- Permissions minimized.
+- Privacy flow and third-party processing documented.
+- Required M1 file inventory completed.
+
+For current implementation evidence, use the versioned milestone documents under [`docs/ava/`](./ava/).
