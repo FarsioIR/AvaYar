@@ -42,6 +42,13 @@ jobs:
       - name: Smoke test
         run: npm run smoke
 
+      - name: Diagnose Gemini hosted-runner route
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          test -n "$GEMINI_API_KEY"
+          node scripts/diagnose-gemini-ci-route.mjs
+
       - name: Live Gemini Iranian Persian speech
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
