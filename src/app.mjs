@@ -3,6 +3,8 @@ import { ServerTranslationProvider } from "./providers/server-translation.mjs";
 import { createServerSpeaker } from "./providers/server-speech.mjs";
 
 const elements = {
+  pageUrl: document.querySelector("#pageUrl"),
+  extractButton: document.querySelector("#extractButton"),
   sourceText: document.querySelector("#sourceText"),
   mode: document.querySelector("#mode"),
   voicePreference: document.querySelector("#voicePreference"),
@@ -17,7 +19,8 @@ const elements = {
   outputText: document.querySelector("#outputText"),
   languageBadge: document.querySelector("#languageBadge"),
   voiceBadge: document.querySelector("#voiceBadge"),
-  providerBadge: document.querySelector("#providerBadge")
+  providerBadge: document.querySelector("#providerBadge"),
+  extractionBadge: document.querySelector("#extractionBadge")
 };
 
 const translator = new ServerTranslationProvider();
@@ -42,29 +45,48 @@ async function loadCapabilities() {
     const response = await fetch("/api/capabilities");
     capabilities = await response.json();
 
-    const translation = capabilities.translationConfigured ? "ترجمه ✓" : "ترجمه —";
-    const speech = capabilities.speechConfigured ? "صدا ✓" : "صدا —";
-    elements.providerBadge.textContent = `Azure: ${translation} / ${speech}`;
+    const translation =
+      capabilities.translationConfigured
+        ? "ترجمه محلی ✓"
+        : "ترجمه —";
+
+    const speech =
+      capabilities.speechConfigured
+        ? "صدای فارسی ✓"
+        : "صدا —";
+
+    elements.providerBadge.textContent =
+      `Keyless: ${translation} / ${speech}`;
   } catch {
-    elements.providerBadge.textContent = "Azure: وضعیت نامشخص";
+    elements.providerBadge.textContent =
+      "Keyless: وضعیت نامشخص";
   }
 }
 
 function renderPrepared(result) {
   prepared = result;
-  elements.outputText.textContent = result.listeningText;
+  elements.outputText.textContent =
+    result.listeningText;
   elements.outputText.classList.remove("empty");
+
   elements.languageBadge.textContent =
     result.sourceLanguage === "fa"
       ? `زبان: فارسی (${result.languageConfidence})`
       : `زبان: ترجمه‌شده به فارسی (${result.languageConfidence})`;
-  setPlaybackEnabled(Boolean(capabilities?.speechConfigured));
 
-  const modeLabel = result.mode === "summary" ? "خلاصه" : "کامل";
+  setPlaybackEnabled(
+    Boolean(capabilities?.speechConfigured)
+  );
+
+  const modeLabel =
+    result.mode === "summary"
+      ? "خلاصه"
+      : "کامل";
+
   setStatus(
     capabilities?.speechConfigured
       ? `خروجی ${modeLabel} آماده پخش است.`
-      : `خروجی ${modeLabel} آماده است؛ Azure Speech هنوز تنظیم نشده است.`
+      : `خروجی ${modeLabel} آماده است؛ سرویس صدای فارسی در دسترس نیست.`
   );
 }
 
@@ -76,68 +98,184 @@ async function prepare() {
     const result = await prepareListening({
       text: elements.sourceText.value,
       mode: elements.mode.value,
-      voicePreference: elements.voicePreference.value,
+      voicePreference:
+        elements.voicePreference.value,
       translator
     });
 
     renderPrepared(result);
   } catch (error) {
     prepared = null;
-    elements.outputText.textContent = "خروجی آماده نشد.";
+    elements.outputText.textContent =
+      "خروجی آماده نشد.";
     elements.outputText.classList.add("empty");
-    elements.languageBadge.textContent = "زبان: —";
-    setStatus(error instanceof Error ? error.message : String(error), true);
+    elements.languageBadge.textContent =
+      "زبان: —";
+
+    setStatus(
+      error instanceof Error
+        ? error.message
+        : String(error),
+      true
+    );
   }
 }
 
-elements.prepareButton.addEventListener("click", prepare);
+async function extractPage() {
+  const pageUrl = elements.pageUrl.value.trim();
 
-elements.playButton.addEventListener("click", async () => {
-  if (!prepared) {
+  if (!pageUrl) {
+    setStatus(
+      "آدرس HTTPS صفحه را وارد کنید.",
+      true
+    );
     return;
   }
 
-  setStatus("در حال ساخت صدای فارسی…");
+  elements.extractButton.disabled = true;
+  setStatus(
+    "در حال دریافت امن و استخراج محتوای اصلی صفحه…"
+  );
 
   try {
-    const result = await speaker.speak({
-      text: prepared.listeningText,
-      rate: Number(elements.rate.value),
-      voicePreference: elements.voicePreference.value
+    const response = await fetch("/api/extract", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        url: pageUrl
+      })
     });
 
-    elements.voiceBadge.textContent =
-      `صدا: ${result.voiceName} / ${result.voiceGender}`;
+    const payload = await response.json();
 
-    setStatus("پخش با صدای فارسی Azure شروع شد.");
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+        "استخراج صفحه ناموفق بود."
+      );
+    }
+
+    elements.sourceText.value = payload.text;
+
+    const title =
+      payload.title ||
+      new URL(payload.url).hostname;
+
+    elements.extractionBadge.textContent =
+      `صفحه: ${title}`;
+
+    if (payload.truncated) {
+      setStatus(
+        "محتوای اصلی استخراج شد؛ متن بسیار بلند تا سقف امن AvaYar کوتاه شد."
+      );
+    } else {
+      setStatus(
+        "محتوای اصلی صفحه استخراج شد؛ در حال آماده‌سازی خروجی فارسی…"
+      );
+    }
+
+    await prepare();
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : String(error), true);
+    elements.extractionBadge.textContent =
+      "صفحه: —";
+
+    setStatus(
+      error instanceof Error
+        ? error.message
+        : String(error),
+      true
+    );
+  } finally {
+    elements.extractButton.disabled = false;
   }
-});
+}
 
-elements.pauseButton.addEventListener("click", () => {
-  speaker.pause();
-  setStatus("پخش متوقف موقت شد.");
-});
+elements.extractButton.addEventListener(
+  "click",
+  extractPage
+);
 
-elements.resumeButton.addEventListener("click", async () => {
-  await speaker.resume();
-  setStatus("پخش ادامه یافت.");
-});
+elements.prepareButton.addEventListener(
+  "click",
+  prepare
+);
 
-elements.stopButton.addEventListener("click", () => {
-  speaker.stop();
-  setStatus("پخش متوقف شد.");
-});
+elements.playButton.addEventListener(
+  "click",
+  async () => {
+    if (!prepared) {
+      return;
+    }
 
-elements.rate.addEventListener("input", () => {
-  const rate = Number(elements.rate.value);
-  elements.rateValue.textContent = `${rate.toFixed(1)}×`;
-  speaker.setRate(rate);
-});
+    setStatus("در حال ساخت صدای فارسی…");
+
+    try {
+      const result = await speaker.speak({
+        text: prepared.listeningText,
+        rate: Number(elements.rate.value),
+        voicePreference:
+          elements.voicePreference.value
+      });
+
+      elements.voiceBadge.textContent =
+        `صدا: ${result.voiceName} / ${result.voiceGender}`;
+
+      setStatus(
+        "پخش با صدای فارسی شروع شد."
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : String(error),
+        true
+      );
+    }
+  }
+);
+
+elements.pauseButton.addEventListener(
+  "click",
+  () => {
+    speaker.pause();
+    setStatus("پخش متوقف موقت شد.");
+  }
+);
+
+elements.resumeButton.addEventListener(
+  "click",
+  async () => {
+    await speaker.resume();
+    setStatus("پخش ادامه یافت.");
+  }
+);
+
+elements.stopButton.addEventListener(
+  "click",
+  () => {
+    speaker.stop();
+    setStatus("پخش متوقف شد.");
+  }
+);
+
+elements.rate.addEventListener(
+  "input",
+  () => {
+    const rate = Number(elements.rate.value);
+
+    elements.rateValue.textContent =
+      `${rate.toFixed(1)}×`;
+
+    speaker.setRate(rate);
+  }
+);
+
+elements.pageUrl.value =
+  "https://example.com/";
 
 elements.sourceText.value =
-  "AvaYar can translate non-Persian text to Persian through Azure Translator. " +
-  "It can also synthesize Persian speech using explicit female and male Azure voices.";
+  "AvaYar can translate non-Persian text locally and synthesize Persian speech with explicit female and male voices.";
 
 await loadCapabilities();

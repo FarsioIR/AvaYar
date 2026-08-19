@@ -1,30 +1,36 @@
-:root {
-  font-family: Inter, Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #161616;
-  background: #f5f4f0;
-  font-synthesis: none;
-}
-
 * {
   box-sizing: border-box;
 }
 
+:root {
+  font-family:
+    Inter,
+    Vazirmatn,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #141414;
+  background: #f4f4f2;
+}
+
 body {
   margin: 0;
-  min-width: 320px;
+  min-height: 100vh;
 }
 
 button,
+input,
 textarea,
-select,
-input {
+select {
   font: inherit;
 }
 
 .shell {
-  width: min(980px, calc(100% - 32px));
+  width: min(960px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 56px 0 80px;
+  padding: 48px 0 72px;
 }
 
 .hero {
@@ -32,11 +38,11 @@ input {
 }
 
 .eyebrow {
-  margin: 0 0 10px;
-  font-size: 0.82rem;
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #626262;
 }
 
 h1,
@@ -46,94 +52,114 @@ p {
 }
 
 h1 {
+  max-width: 720px;
   margin-bottom: 14px;
-  font-size: clamp(2.2rem, 6vw, 4.7rem);
-  line-height: 1.04;
-  letter-spacing: -0.04em;
+  font-size: clamp(2rem, 6vw, 4.8rem);
+  line-height: 1.05;
 }
 
 .lede {
   max-width: 720px;
-  color: #555;
+  color: #535353;
+  font-size: 1.05rem;
   line-height: 1.9;
 }
 
 .card,
 .notice {
-  border: 1px solid #dedbd2;
+  margin-top: 18px;
+  border: 1px solid #deded8;
   border-radius: 18px;
   background: #fff;
-  padding: 24px;
-  margin-top: 18px;
+  padding: 22px;
+}
+
+.section-heading,
+.badge-group,
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .section-heading {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
   margin-bottom: 18px;
 }
 
 .section-heading h2 {
-  margin: 0;
+  margin-bottom: 0;
 }
 
 .badge {
   display: inline-flex;
-  border: 1px solid #d8d4ca;
+  min-height: 32px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #deded8;
   border-radius: 999px;
-  padding: 6px 10px;
-  color: #5c5c5c;
-  font-size: 0.85rem;
+  background: #f7f7f4;
+  font-size: 0.82rem;
 }
 
 .field {
   display: grid;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.field > span {
+  color: #3f3f3f;
+  font-size: 0.88rem;
+  font-weight: 650;
 }
 
 textarea,
-select {
+select,
+input[type="url"] {
   width: 100%;
-  border: 1px solid #cbc7bd;
+  border: 1px solid #cbcbc4;
   border-radius: 12px;
-  background: #fcfcfa;
-  padding: 12px 14px;
-  outline: none;
+  background: #fff;
+  color: inherit;
+  padding: 12px 13px;
 }
 
-textarea:focus,
-select:focus,
-input:focus {
-  border-color: #343434;
+textarea {
+  resize: vertical;
+  line-height: 1.75;
 }
 
 .grid.two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 22px;
+.url-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.url-actions .field {
+  margin-bottom: 0;
 }
 
 button {
-  border: 1px solid #c8c4bb;
-  border-radius: 999px;
-  background: #fff;
-  padding: 10px 16px;
+  min-height: 42px;
+  border: 1px solid #c9c9c2;
+  border-radius: 12px;
+  background: #f7f7f4;
+  padding: 8px 15px;
   cursor: pointer;
 }
 
 button.primary {
-  background: #171717;
-  border-color: #171717;
+  border-color: #111;
+  background: #111;
   color: #fff;
 }
 
@@ -144,49 +170,48 @@ button:disabled {
 
 .status {
   margin: 16px 0 0;
-  color: #555;
-  line-height: 1.8;
+  color: #444;
+  line-height: 1.7;
 }
 
 .status.error {
-  color: #9b1c1c;
+  color: #a60000;
 }
 
 .output {
-  min-height: 140px;
+  min-height: 120px;
   white-space: pre-wrap;
-  line-height: 2;
+  line-height: 1.85;
 }
 
 .output.empty {
-  color: #8a8a8a;
+  color: #777;
 }
 
-.notice {
-  line-height: 1.9;
-  background: transparent;
+.notice,
+.privacy-note {
+  color: #555;
+  line-height: 1.85;
 }
 
-@media (max-width: 700px) {
-  .shell {
-    width: min(100% - 20px, 980px);
-    padding-top: 28px;
-  }
+.privacy-note {
+  margin: 12px 0 0;
+  font-size: 0.88rem;
+}
 
-  .grid.two {
+code {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+@media (max-width: 720px) {
+  .grid.two,
+  .url-actions {
     grid-template-columns: 1fr;
   }
 
-  .card,
-  .notice {
-    padding: 18px;
-    border-radius: 14px;
+  .shell {
+    width: min(100% - 20px, 960px);
+    padding-top: 28px;
   }
-}
-
-.badge-group {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
 }
