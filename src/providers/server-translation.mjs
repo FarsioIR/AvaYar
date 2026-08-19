@@ -1,6 +1,6 @@
 export class ServerTranslationProvider {
   constructor({ fetchImpl = globalThis.fetch } = {}) {
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = fetchImpl.bind(globalThis);
   }
 
   async translateToPersian(text) {
