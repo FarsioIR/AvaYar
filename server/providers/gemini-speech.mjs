@@ -164,6 +164,41 @@ function statusFromError(error) {
     : 0;
 }
 
+function isInteractionsInvalidRequest(
+  error
+) {
+  if (
+    statusFromError(
+      error
+    ) !== 400
+  ) {
+    return false;
+  }
+
+  const details =
+    [
+      error?.message,
+      error?.body,
+      error?.error?.error?.message,
+      error?.error?.error?.code,
+      error?.cause?.message,
+      error?.cause?.body,
+      error?.cause?.error?.message,
+      error?.cause?.error?.code
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+  return (
+    /invalid_request/i.test(
+      details
+    ) ||
+    /request contains an invalid argument/i.test(
+      details
+    )
+  );
+}
+
 function retryDelayFromError(error) {
   const headerValue =
     typeof error?.headers?.get === "function"
@@ -230,6 +265,35 @@ function retryDelayFromError(error) {
   }
 
   return DEFAULT_RETRY_MS;
+}
+
+function findGenerateContentAudioData(
+  generated
+) {
+  const parts =
+    generated
+      ?.candidates
+      ?.[0]
+      ?.content
+      ?.parts;
+
+  if (!Array.isArray(parts)) {
+    return null;
+  }
+
+  const audioPart =
+    parts.find(
+      (part) =>
+        typeof part
+          ?.inlineData
+          ?.data ===
+          "string"
+    );
+
+  return audioPart
+    ?.inlineData
+    ?.data ??
+    null;
 }
 
 export class GeminiPersianSpeechSynthesizer {
@@ -356,44 +420,143 @@ export class GeminiPersianSpeechSynthesizer {
     }
   }
 
+  async generateContentWithRetry(
+    request
+  ) {
+    if (
+      !this.client?.models ||
+      typeof this.client
+        .models
+        .generateContent !==
+          "function"
+    ) {
+      throw new TypeError(
+        "Gemini client must expose models.generateContent() for TTS fallback."
+      );
+    }
+
+    for (
+      let attempt = 0;
+      ;
+      attempt += 1
+    ) {
+      try {
+        return await this.client
+          .models
+          .generateContent(
+            request
+          );
+      } catch (error) {
+        const isRateLimit =
+          statusFromError(
+            error
+          ) === 429;
+
+        if (
+          !isRateLimit ||
+          attempt >=
+            this.maxRateLimitRetries
+        ) {
+          throw error;
+        }
+
+        const delayMs =
+          retryDelayFromError(
+            error
+          );
+
+        await this.sleepImpl(
+          delayMs
+        );
+      }
+    }
+  }
+
   async synthesizeChunk({
     chunk,
     voice
   }) {
-    const interaction =
-      await this
-        .createInteractionWithRetry({
-          model:
-            this.model,
-          input:
-            buildIranianPersianNarrationPrompt(
-              chunk
-            ),
-          response_format: {
-            type:
-              "audio"
-          },
-          generation_config: {
-            speech_config: [
-              {
-                voice:
-                  voice.name
-              }
-            ]
-          }
-        });
+    const prompt =
+      buildIranianPersianNarrationPrompt(
+        chunk
+      );
 
-    const data =
-      interaction
-        ?.output_audio
-        ?.data;
+    let data = null;
+    let transport =
+      "official-google-genai-sdk-interactions";
+
+    try {
+      const interaction =
+        await this
+          .createInteractionWithRetry({
+            model:
+              this.model,
+            input:
+              prompt,
+            response_format: {
+              type:
+                "audio"
+            },
+            generation_config: {
+              speech_config: [
+                {
+                  voice:
+                    voice.name
+                }
+              ]
+            }
+          });
+
+      data =
+        interaction
+          ?.output_audio
+          ?.data;
+    } catch (error) {
+      if (
+        !isInteractionsInvalidRequest(
+          error
+        )
+      ) {
+        throw error;
+      }
+
+      const generated =
+        await this
+          .generateContentWithRetry({
+            model:
+              this.model,
+            contents:
+              prompt,
+            config: {
+              responseModalities: [
+                "AUDIO"
+              ],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName:
+                      voice.name
+                  }
+                }
+              }
+            }
+          });
+
+      data =
+        findGenerateContentAudioData(
+          generated
+        );
+
+      transport =
+        "official-google-genai-sdk-generate-content-fallback";
+    }
 
     if (
       typeof data !== "string" ||
       data.length < 16
     ) {
       throw new Error(
-        "Gemini TTS response did not include output_audio.data."
+        "Gemini TTS response did not include base64 PCM audio."
       );
     }
 
@@ -412,7 +575,10 @@ export class GeminiPersianSpeechSynthesizer {
       );
     }
 
-    return pcm;
+    return {
+      pcm,
+      transport
+    };
   }
 
   async synthesize({
@@ -445,18 +611,32 @@ export class GeminiPersianSpeechSynthesizer {
       );
 
     const pcmChunks = [];
+    const transports =
+      new Set();
 
     for (
       const chunk of chunks
     ) {
-      pcmChunks.push(
+      const chunkResult =
         await this
           .synthesizeChunk({
             chunk,
             voice
-          })
+          });
+
+      pcmChunks.push(
+        chunkResult.pcm
+      );
+
+      transports.add(
+        chunkResult.transport
       );
     }
+
+    const transport =
+      transports.size === 1
+        ? [...transports][0]
+        : "official-google-genai-sdk-mixed";
 
     return {
       audio:
@@ -470,8 +650,7 @@ export class GeminiPersianSpeechSynthesizer {
       voice,
       provider:
         "gemini-tts",
-      transport:
-        "official-google-genai-sdk-interactions",
+      transport,
       model:
         this.model,
       chunkCount:

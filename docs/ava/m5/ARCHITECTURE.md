@@ -64,3 +64,15 @@ the AvaYar Node child through `HTTP_PROXY` / `HTTPS_PROXY`,
 
 This preserves the machine's existing network policy and does not change
 Windows proxy settings.
+
+## Official Gemini TTS transport resilience
+
+AvaYar keeps the official Gemini Interactions TTS API as the primary transport.
+
+If Interactions returns the specific HTTP 400 `invalid_request` failure, AvaYar
+falls back to the official `@google/genai` `models.generateContent()` speech
+path with the same model, narration prompt, and voice. The fallback requests
+`AUDIO` output with `speechConfig.voiceConfig.prebuiltVoiceConfig`.
+
+HTTP 429 handling remains bounded and retry-aware on both official transports.
+Other Interactions failures do not trigger this fallback.
