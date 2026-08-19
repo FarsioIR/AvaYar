@@ -1,6 +1,13 @@
-import { getAzureConfig, getProviderCapabilities } from "./config.mjs";
-import { AzureTranslator } from "./providers/azure-translator.mjs";
-import { AzureSpeechSynthesizer } from "./providers/azure-speech.mjs";
+import {
+  getFreeProviderConfig,
+  getProviderCapabilities
+} from "./config.mjs";
+import {
+  LocalM2M100Translator
+} from "./providers/local-m2m100-translator.mjs";
+import {
+  EdgeSpeechSynthesizer
+} from "./providers/edge-speech.mjs";
 
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -32,48 +39,78 @@ async function readJson(request) {
 
 export function createApiHandler({
   env = process.env,
-  fetchImpl = globalThis.fetch
+  translationPipelineFactory,
+  translationLanguageDetector,
+  ttsFactory
 } = {}) {
   return async function handleApi(request, response) {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const url = new URL(
+      request.url ?? "/",
+      "http://127.0.0.1"
+    );
 
     if (!url.pathname.startsWith("/api/")) {
       return false;
     }
 
     try {
-      if (request.method === "GET" && url.pathname === "/api/capabilities") {
-        json(response, 200, getProviderCapabilities(env));
+      if (
+        request.method === "GET" &&
+        url.pathname === "/api/capabilities"
+      ) {
+        json(
+          response,
+          200,
+          getProviderCapabilities(env)
+        );
         return true;
       }
 
-      if (request.method === "POST" && url.pathname === "/api/translate") {
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/translate"
+      ) {
         const body = await readJson(request);
-        const config = getAzureConfig(env);
+        const config = getFreeProviderConfig(env);
 
-        const translator = new AzureTranslator({
-          ...config.translator,
-          fetchImpl
-        });
+        const translator =
+          new LocalM2M100Translator({
+            config: config.translation,
+            pipelineFactory:
+              translationPipelineFactory,
+            languageDetector:
+              translationLanguageDetector
+          });
 
-        const text = await translator.translateToPersian(body.text);
+        const text =
+          await translator.translateToPersian(
+            body.text,
+            {
+              sourceLanguage:
+                typeof body.sourceLanguage === "string"
+                  ? body.sourceLanguage
+                  : null
+            }
+          );
 
         json(response, 200, {
           text,
           to: "fa",
-          provider: "azure"
+          provider: "local-m2m100"
         });
         return true;
       }
 
-      if (request.method === "POST" && url.pathname === "/api/tts") {
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/tts"
+      ) {
         const body = await readJson(request);
-        const config = getAzureConfig(env);
 
-        const synthesizer = new AzureSpeechSynthesizer({
-          ...config.speech,
-          fetchImpl
-        });
+        const synthesizer =
+          new EdgeSpeechSynthesizer({
+            ttsFactory
+          });
 
         const result = await synthesizer.synthesize({
           text: body.text,
@@ -96,7 +133,10 @@ export function createApiHandler({
       return true;
     } catch (error) {
       json(response, 502, {
-        error: error instanceof Error ? error.message : String(error)
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error)
       });
       return true;
     }

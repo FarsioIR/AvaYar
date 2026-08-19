@@ -1,25 +1,59 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  getAzureConfig,
+  getFreeProviderConfig,
   getProviderCapabilities
 } from "../server/config.mjs";
 
-test("provider capabilities expose configuration state without secret values", () => {
-  const env = {
-    AZURE_TRANSLATOR_KEY: "secret-translator",
-    AZURE_TRANSLATOR_REGION: "westeurope",
-    AZURE_SPEECH_KEY: "secret-speech",
-    AZURE_SPEECH_REGION: "westeurope"
-  };
+test(
+  "keyless provider capabilities require no secret values",
+  () => {
+    const env = {
+      AVAYAR_TRANSLATION_DEFAULT_SOURCE: "en",
+      AVAYAR_MODEL_CACHE: "C:\\cache\\avayar"
+    };
 
-  const config = getAzureConfig(env);
-  const capabilities = getProviderCapabilities(env);
+    const config = getFreeProviderConfig(env);
+    const capabilities =
+      getProviderCapabilities(env);
 
-  assert.equal(config.translator.key, "secret-translator");
-  assert.equal(capabilities.translationConfigured, true);
-  assert.equal(capabilities.speechConfigured, true);
-  assert.equal(capabilities.voices.female, "fa-IR-DilaraNeural");
-  assert.equal(capabilities.voices.male, "fa-IR-FaridNeural");
-  assert.equal(JSON.stringify(capabilities).includes("secret"), false);
-});
+    assert.equal(
+      config.translation.defaultSourceLanguage,
+      "en"
+    );
+    assert.equal(
+      capabilities.translationConfigured,
+      true
+    );
+    assert.equal(
+      capabilities.speechConfigured,
+      true
+    );
+    assert.equal(
+      capabilities.requiresApiKey,
+      false
+    );
+    assert.equal(
+      capabilities.translationProvider,
+      "local-m2m100"
+    );
+    assert.equal(
+      capabilities.speechProvider,
+      "edge-read-aloud"
+    );
+    assert.equal(
+      capabilities.voices.female,
+      "fa-IR-DilaraNeural"
+    );
+    assert.equal(
+      capabilities.voices.male,
+      "fa-IR-FaridNeural"
+    );
+    assert.equal(
+      JSON.stringify(capabilities)
+        .toLowerCase()
+        .includes("secret"),
+      false
+    );
+  }
+);

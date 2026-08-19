@@ -14,6 +14,11 @@
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
     "check": "npm run lint && npm test && npm run build && npm run smoke",
-    "live:azure": "node scripts/live-azure-probe.mjs"
+    "live:free-provider": "node scripts/live-free-provider-probe.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0",
+    "franc-min": "6.2.0",
+    "msedge-tts": "2.0.7"
   }
 }

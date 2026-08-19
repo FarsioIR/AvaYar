@@ -2,33 +2,41 @@ function clean(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-export function getAzureConfig(env = process.env) {
+export const FREE_PROVIDER_VOICES = Object.freeze({
+  female: "fa-IR-DilaraNeural",
+  male: "fa-IR-FaridNeural"
+});
+
+export function getFreeProviderConfig(env = process.env) {
   return {
-    translator: {
-      key: clean(env.AZURE_TRANSLATOR_KEY),
-      region: clean(env.AZURE_TRANSLATOR_REGION),
-      endpoint:
-        clean(env.AZURE_TRANSLATOR_ENDPOINT) ??
-        "https://api.cognitive.microsofttranslator.com"
+    translation: {
+      model: "Xenova/m2m100_418M",
+      dtype: "q8",
+      defaultSourceLanguage:
+        clean(env.AVAYAR_TRANSLATION_DEFAULT_SOURCE) ?? "en",
+      cacheDir: clean(env.AVAYAR_MODEL_CACHE)
     },
     speech: {
-      key: clean(env.AZURE_SPEECH_KEY),
-      region: clean(env.AZURE_SPEECH_REGION)
+      voices: FREE_PROVIDER_VOICES,
+      outputFormat: "WEBM_24KHZ_16BIT_MONO_OPUS"
     }
   };
 }
 
 export function getProviderCapabilities(env = process.env) {
-  const config = getAzureConfig(env);
+  const config = getFreeProviderConfig(env);
 
   return {
-    translationConfigured: Boolean(config.translator.key),
-    speechConfigured: Boolean(config.speech.key && config.speech.region),
-    provider: "azure",
+    translationConfigured: true,
+    speechConfigured: true,
+    provider: "free-keyless-hybrid",
+    translationProvider: "local-m2m100",
+    speechProvider: "edge-read-aloud",
+    requiresApiKey: false,
     targetLanguage: "fa",
-    voices: {
-      female: "fa-IR-DilaraNeural",
-      male: "fa-IR-FaridNeural"
-    }
+    defaultSourceLanguage: config.translation.defaultSourceLanguage,
+    model: config.translation.model,
+    modelDtype: config.translation.dtype,
+    voices: config.speech.voices
   };
 }
