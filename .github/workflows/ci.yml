@@ -20,7 +20,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Runtime versions
         run: |
@@ -41,3 +41,10 @@ jobs:
 
       - name: Smoke test
         run: npm run smoke
+
+      - name: Live Gemini Iranian Persian speech
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          test -n "$GEMINI_API_KEY"
+          npm run live:speech

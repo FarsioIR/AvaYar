@@ -33,7 +33,9 @@ export function createServerSpeaker({
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body?.error ?? "Persian speech synthesis failed.");
+        throw new Error(
+          body?.error ?? "Persian speech synthesis failed."
+        );
       }
 
       const blob = await response.blob();
@@ -47,12 +49,15 @@ export function createServerSpeaker({
       return {
         voiceName:
           response.headers.get("x-avayar-voice-name") ??
-          (voicePreference === "female"
-            ? "fa-IR-DilaraNeural"
-            : "fa-IR-FaridNeural"),
+          (voicePreference === "female" ? "Sulafat" : "Iapetus"),
         voiceGender:
           response.headers.get("x-avayar-voice-gender") ??
           (voicePreference === "female" ? "Female" : "Male"),
+        voiceLocale:
+          response.headers.get("x-avayar-voice-locale") ?? "fa-IR",
+        provider:
+          response.headers.get("x-avayar-speech-provider") ??
+          "gemini-tts",
         exactGenderGuaranteed: true
       };
     },
