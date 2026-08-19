@@ -37,28 +37,175 @@ function isBlockedIpv4(address) {
   );
 }
 
-function isBlockedIpv6(address) {
-  const normalized = address.toLowerCase();
+function parseIpv6Hextets(address) {
+  let normalized = address
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
 
-  if (normalized.startsWith("::ffff:")) {
-    const mapped = normalized.slice("::ffff:".length);
+  if (isIP(normalized) !== 6) {
+    return null;
+  }
 
-    if (isIP(mapped) === 4) {
-      return isBlockedIpv4(mapped);
+  if (normalized.includes(".")) {
+    const lastColon = normalized.lastIndexOf(":");
+    const dotted = normalized.slice(lastColon + 1);
+
+    if (isIP(dotted) !== 4) {
+      return null;
+    }
+
+    const octets = dotted
+      .split(".")
+      .map((part) => Number(part));
+
+    const high =
+      ((octets[0] << 8) | octets[1])
+        .toString(16);
+
+    const low =
+      ((octets[2] << 8) | octets[3])
+        .toString(16);
+
+    normalized =
+      `${normalized.slice(0, lastColon)}:${high}:${low}`;
+  }
+
+  const doubleColonCount =
+    normalized.split("::").length - 1;
+
+  if (doubleColonCount > 1) {
+    return null;
+  }
+
+  let parts;
+
+  if (normalized.includes("::")) {
+    const [leftText, rightText] =
+      normalized.split("::");
+
+    const left =
+      leftText
+        ? leftText.split(":")
+        : [];
+
+    const right =
+      rightText
+        ? rightText.split(":")
+        : [];
+
+    const missing =
+      8 - left.length - right.length;
+
+    if (missing < 1) {
+      return null;
+    }
+
+    parts = [
+      ...left,
+      ...Array(missing).fill("0"),
+      ...right
+    ];
+  } else {
+    parts = normalized.split(":");
+
+    if (parts.length !== 8) {
+      return null;
     }
   }
 
+  const hextets =
+    parts.map((part) => {
+      if (!/^[0-9a-f]{1,4}$/u.test(part)) {
+        return null;
+      }
+
+      return Number.parseInt(part, 16);
+    });
+
+  if (
+    hextets.length !== 8 ||
+    hextets.some((part) => part === null)
+  ) {
+    return null;
+  }
+
+  return hextets;
+}
+
+function ipv6ToBigInt(address) {
+  const hextets = parseIpv6Hextets(address);
+
+  if (!hextets) {
+    return null;
+  }
+
+  return hextets.reduce(
+    (value, part) =>
+      (value << 16n) | BigInt(part),
+    0n
+  );
+}
+
+function isIpv6InPrefix(
+  address,
+  prefix,
+  prefixLength
+) {
+  const value = ipv6ToBigInt(address);
+  const base = ipv6ToBigInt(prefix);
+
+  if (
+    value === null ||
+    base === null ||
+    !Number.isInteger(prefixLength) ||
+    prefixLength < 0 ||
+    prefixLength > 128
+  ) {
+    return false;
+  }
+
+  if (prefixLength === 0) {
+    return true;
+  }
+
+  const shift =
+    BigInt(128 - prefixLength);
+
   return (
-    normalized === "::" ||
-    normalized === "::1" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    normalized.startsWith("fe8") ||
-    normalized.startsWith("fe9") ||
-    normalized.startsWith("fea") ||
-    normalized.startsWith("feb") ||
-    normalized.startsWith("ff") ||
-    normalized.startsWith("2001:db8:")
+    value >> shift
+  ) === (
+    base >> shift
+  );
+}
+
+const BLOCKED_IPV6_PREFIXES = Object.freeze([
+  ["::", 96],
+  ["::ffff:0:0", 96],
+  ["64:ff9b::", 96],
+  ["64:ff9b:1::", 48],
+  ["100::", 64],
+  ["100:0:0:1::", 64],
+  ["2001::", 32],
+  ["2001:2::", 48],
+  ["2001:10::", 28],
+  ["2001:db8::", 32],
+  ["2002::", 16],
+  ["3fff::", 20],
+  ["5f00::", 16],
+  ["fc00::", 7],
+  ["fe80::", 10],
+  ["fec0::", 10],
+  ["ff00::", 8]
+]);
+
+function isBlockedIpv6(address) {
+  return BLOCKED_IPV6_PREFIXES.some(
+    ([prefix, prefixLength]) =>
+      isIpv6InPrefix(
+        address,
+        prefix,
+        prefixLength
+      )
   );
 }
 
