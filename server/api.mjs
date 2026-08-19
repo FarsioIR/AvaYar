@@ -8,6 +8,9 @@ import {
 import {
   EdgeSpeechSynthesizer
 } from "./providers/edge-speech.mjs";
+import {
+  WebpageExtractor
+} from "./extraction/webpage-extractor.mjs";
 
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -41,7 +44,8 @@ export function createApiHandler({
   env = process.env,
   translationPipelineFactory,
   translationLanguageDetector,
-  ttsFactory
+  ttsFactory,
+  webpageExtractorFactory
 } = {}) {
   return async function handleApi(request, response) {
     const url = new URL(
@@ -63,6 +67,24 @@ export function createApiHandler({
           200,
           getProviderCapabilities(env)
         );
+        return true;
+      }
+
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/extract"
+      ) {
+        const body = await readJson(request);
+
+        const extractor =
+          webpageExtractorFactory
+            ? webpageExtractorFactory()
+            : new WebpageExtractor();
+
+        const result =
+          await extractor.extract(body.url);
+
+        json(response, 200, result);
         return true;
       }
 

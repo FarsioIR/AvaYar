@@ -2,7 +2,10 @@
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
     <meta
       name="description"
       content="AvaYar — دستیار خواندن و شنیدن فارسی"
@@ -14,24 +17,71 @@
     <main class="shell">
       <header class="hero">
         <p class="eyebrow">Farsio / AvaYar</p>
-        <h1>متن را بده؛ فارسی گوش کن.</h1>
+        <h1>صفحه را بده؛ فارسی گوش کن.</h1>
         <p class="lede">
-          آوایار متن فارسی یا غیر فارسی را آماده می‌کند، نسخه کامل یا خلاصه می‌سازد
-          و با صدای فارسی زن یا مرد پخش می‌کند.
+          آوایار محتوای اصلی یک صفحه HTTPS را استخراج می‌کند، متن غیر فارسی
+          را به فارسی برمی‌گرداند، نسخه کامل یا خلاصه می‌سازد و با صدای فارسی
+          زن یا مرد پخش می‌کند.
         </p>
       </header>
 
-      <section class="card" aria-labelledby="input-title">
+      <section
+        class="card"
+        aria-labelledby="page-title"
+      >
+        <div class="section-heading">
+          <h2 id="page-title">صفحه وب</h2>
+          <span
+            id="extractionBadge"
+            class="badge"
+          >صفحه: —</span>
+        </div>
+
+        <div class="url-actions">
+          <label class="field">
+            <span>آدرس امن صفحه (HTTPS)</span>
+            <input
+              id="pageUrl"
+              type="url"
+              inputmode="url"
+              autocomplete="url"
+              placeholder="https://example.com/article"
+            />
+          </label>
+
+          <button
+            id="extractButton"
+            class="primary"
+            type="button"
+          >استخراج صفحه</button>
+        </div>
+
+        <p class="privacy-note">
+          آوایار فقط URLهای HTTPS عمومی را می‌پذیرد؛ localhost، شبکه خصوصی،
+          credential داخل URL و redirect به مقصد خصوصی مسدود هستند.
+        </p>
+      </section>
+
+      <section
+        class="card"
+        aria-labelledby="input-title"
+      >
         <div class="section-heading">
           <h2 id="input-title">متن</h2>
           <div class="badge-group">
-            <span id="languageBadge" class="badge">زبان: —</span>
-            <span id="providerBadge" class="badge">Azure: در حال بررسی…</span>
+            <span
+              id="languageBadge"
+              class="badge"
+            >زبان: —</span>
+            <span
+              id="providerBadge"
+              class="badge"
+            >Keyless: در حال بررسی…</span>
           </div>
         </div>
 
         <label class="field">
-          <span>متن ورودی</span>
+          <span>متن ورودی / استخراج‌شده</span>
           <textarea
             id="sourceText"
             rows="12"
@@ -51,45 +101,98 @@
           <label class="field">
             <span>صدای فارسی</span>
             <select id="voicePreference">
-              <option value="female">زن — Dilara</option>
-              <option value="male">مرد — Farid</option>
+              <option value="female">
+                زن — Dilara
+              </option>
+              <option value="male">
+                مرد — Farid
+              </option>
             </select>
           </label>
         </div>
 
         <label class="field">
-          <span>سرعت پخش: <strong id="rateValue">1.0×</strong></span>
-          <input id="rate" type="range" min="0.6" max="1.8" value="1" step="0.1" />
+          <span>
+            سرعت پخش:
+            <strong id="rateValue">1.0×</strong>
+          </span>
+          <input
+            id="rate"
+            type="range"
+            min="0.6"
+            max="1.8"
+            value="1"
+            step="0.1"
+          />
         </label>
 
         <div class="actions">
-          <button id="prepareButton" class="primary" type="button">آماده‌سازی</button>
-          <button id="playButton" type="button" disabled>پخش</button>
-          <button id="pauseButton" type="button" disabled>مکث</button>
-          <button id="resumeButton" type="button" disabled>ادامه</button>
-          <button id="stopButton" type="button" disabled>توقف</button>
+          <button
+            id="prepareButton"
+            class="primary"
+            type="button"
+          >آماده‌سازی</button>
+          <button
+            id="playButton"
+            type="button"
+            disabled
+          >پخش</button>
+          <button
+            id="pauseButton"
+            type="button"
+            disabled
+          >مکث</button>
+          <button
+            id="resumeButton"
+            type="button"
+            disabled
+          >ادامه</button>
+          <button
+            id="stopButton"
+            type="button"
+            disabled
+          >توقف</button>
         </div>
 
-        <p id="status" class="status" role="status">در حال بررسی providerها…</p>
+        <p
+          id="status"
+          class="status"
+          role="status"
+        >در حال بررسی providerها…</p>
       </section>
 
-      <section class="card" aria-labelledby="output-title">
+      <section
+        class="card"
+        aria-labelledby="output-title"
+      >
         <div class="section-heading">
-          <h2 id="output-title">خروجی شنیداری</h2>
-          <span id="voiceBadge" class="badge">صدا: —</span>
+          <h2 id="output-title">
+            خروجی شنیداری
+          </h2>
+          <span
+            id="voiceBadge"
+            class="badge"
+          >صدا: —</span>
         </div>
-        <div id="outputText" class="output empty">هنوز خروجی آماده نشده است.</div>
+
+        <div
+          id="outputText"
+          class="output empty"
+        >هنوز خروجی آماده نشده است.</div>
       </section>
 
       <section class="notice">
-        <strong>M3:</strong>
-        Azure Translator برای ترجمه به فارسی و Azure Speech برای دو صدای مشخص
-        <code>fa-IR-DilaraNeural</code> و <code>fa-IR-FaridNeural</code>
-        از طریق server-side provider استفاده می‌شوند. کلیدهای Azure هرگز به
-        browser ارسال نمی‌شوند.
+        <strong>M4:</strong>
+        استخراج صفحه روی سرور AvaYar با HTTPS-only و کنترل مقصد انجام می‌شود.
+        ترجمه بعد از دانلود مدل M2M100 محلی است. با فشردن «پخش»، متن خروجی
+        برای تولید صوت به Microsoft Edge Read Aloud ارسال می‌شود؛ این سرویس
+        یک API قراردادی Azure نیست.
       </section>
     </main>
 
-    <script type="module" src="/src/app.mjs"></script>
+    <script
+      type="module"
+      src="/src/app.mjs"
+    ></script>
   </body>
 </html>
