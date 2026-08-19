@@ -183,3 +183,10 @@ button:disabled {
     border-radius: 14px;
   }
 }
+
+.badge-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

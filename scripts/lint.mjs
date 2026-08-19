@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const roots = ["src", "scripts", "test"];
+const roots = ["src", "server", "scripts", "test"];
 const sourceFiles = [];
 
 async function walk(directory) {

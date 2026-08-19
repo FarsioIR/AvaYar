@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createApiHandler } from "../server/api.mjs";
 
 function parseArgs(argv) {
   const result = {
@@ -33,6 +33,7 @@ const MIME = {
 
 const { root, port } = parseArgs(process.argv.slice(2));
 const isDist = root.endsWith(`${sep}dist`);
+const handleApi = createApiHandler();
 
 function safePath(requestPath) {
   const decoded = decodeURIComponent(requestPath.split("?")[0]);
@@ -58,6 +59,10 @@ const server = createServer(async (request, response) => {
   if (request.url === "/healthz") {
     response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ ok: true, product: "ava" }));
+    return;
+  }
+
+  if (await handleApi(request, response)) {
     return;
   }
 
@@ -87,7 +92,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`Ava dev server: http://127.0.0.1:${port}`);
+  console.log(`Ava server: http://127.0.0.1:${port}`);
 });
 
 if (process.env.AVA_PRINT_PID === "1") {

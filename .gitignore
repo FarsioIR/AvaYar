@@ -5,6 +5,7 @@ coverage/
 .env.*
 !.env.example
 *.log
+*.mp3
 .DS_Store
 Thumbs.db
 .vscode/

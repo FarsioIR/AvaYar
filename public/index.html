@@ -5,26 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Ava — تبدیل متن به تجربه شنیداری فارسی"
+      content="AvaYar — دستیار خواندن و شنیدن فارسی"
     />
-    <title>Ava — Farsio</title>
+    <title>AvaYar · آوایار — Farsio</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="shell">
       <header class="hero">
-        <p class="eyebrow">Farsio / Ava</p>
+        <p class="eyebrow">Farsio / AvaYar</p>
         <h1>متن را بده؛ فارسی گوش کن.</h1>
         <p class="lede">
-          پایه اجرایی Ava: متن فارسی، حالت کامل یا خلاصه، انتخاب صدای ترجیحی،
-          کنترل سرعت و پخش مرورگر.
+          آوایار متن فارسی یا غیر فارسی را آماده می‌کند، نسخه کامل یا خلاصه می‌سازد
+          و با صدای فارسی زن یا مرد پخش می‌کند.
         </p>
       </header>
 
       <section class="card" aria-labelledby="input-title">
         <div class="section-heading">
           <h2 id="input-title">متن</h2>
-          <span id="languageBadge" class="badge">زبان: —</span>
+          <div class="badge-group">
+            <span id="languageBadge" class="badge">زبان: —</span>
+            <span id="providerBadge" class="badge">Azure: در حال بررسی…</span>
+          </div>
         </div>
 
         <label class="field">
@@ -32,7 +35,7 @@
           <textarea
             id="sourceText"
             rows="12"
-            placeholder="متن فارسی را اینجا وارد کنید…"
+            placeholder="متن فارسی یا غیر فارسی را اینجا وارد کنید…"
           ></textarea>
         </label>
 
@@ -46,10 +49,10 @@
           </label>
 
           <label class="field">
-            <span>صدای ترجیحی</span>
+            <span>صدای فارسی</span>
             <select id="voicePreference">
-              <option value="female">زن</option>
-              <option value="male">مرد</option>
+              <option value="female">زن — Dilara</option>
+              <option value="male">مرد — Farid</option>
             </select>
           </label>
         </div>
@@ -67,7 +70,7 @@
           <button id="stopButton" type="button" disabled>توقف</button>
         </div>
 
-        <p id="status" class="status" role="status">آماده برای دریافت متن فارسی.</p>
+        <p id="status" class="status" role="status">در حال بررسی providerها…</p>
       </section>
 
       <section class="card" aria-labelledby="output-title">
@@ -79,11 +82,11 @@
       </section>
 
       <section class="notice">
-        <strong>مرز M2:</strong>
-        متن فارسی همین حالا قابل آماده‌سازی و پخش است. برای متن غیر فارسی،
-        Ava عمداً خطای واضح «provider ترجمه تنظیم نشده» می‌دهد. تضمین صدای
-        واقعی زن/مرد نیز به provider تولید گفتار در milestone بعدی متصل می‌شود؛
-        Web Speech API مرورگر اطلاعات جنسیت صدا را استاندارد نمی‌کند.
+        <strong>M3:</strong>
+        Azure Translator برای ترجمه به فارسی و Azure Speech برای دو صدای مشخص
+        <code>fa-IR-DilaraNeural</code> و <code>fa-IR-FaridNeural</code>
+        از طریق server-side provider استفاده می‌شوند. کلیدهای Azure هرگز به
+        browser ارسال نمی‌شوند.
       </section>
     </main>
 

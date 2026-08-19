@@ -10,4 +10,5 @@ await mkdir(dist, { recursive: true });
 await cp(resolve(root, "public"), dist, { recursive: true });
 await cp(resolve(root, "src"), resolve(dist, "src"), { recursive: true });
 
-console.log(`Built Ava runtime into ${dist}`);
+console.log(`Built Ava browser client into ${dist}`);
+console.log("Server-side keyless providers remain in server/ and run via scripts/dev-server.mjs.");

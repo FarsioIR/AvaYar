@@ -1,9 +1,9 @@
 {
-  "name": "ava-farsio-runtime",
-  "version": "0.2.0",
+  "name": "avayar-farsio-runtime",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Executable foundation for Ava, a Farsio product.",
+  "description": "Executable foundation for AvaYar, a Farsio product.",
   "engines": {
     "node": ">=22"
   },
@@ -13,6 +13,12 @@
     "test": "node --test",
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "check": "npm run lint && npm test && npm run build && npm run smoke"
+    "check": "npm run lint && npm test && npm run build && npm run smoke",
+    "live:free-provider": "node scripts/live-free-provider-probe.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0",
+    "franc-min": "6.2.0",
+    "msedge-tts": "2.0.7"
   }
 }
