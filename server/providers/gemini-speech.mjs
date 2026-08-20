@@ -525,8 +525,16 @@ export class GeminiPersianSpeechSynthesizer {
           .generateContentWithRetry({
             model:
               this.model,
-            contents:
-              prompt,
+            contents: [
+              {
+                parts: [
+                  {
+                    text:
+                      prompt
+                  }
+                ]
+              }
+            ],
             config: {
               responseModalities: [
                 "AUDIO"
