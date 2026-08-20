@@ -42,6 +42,9 @@ jobs:
       - name: Smoke test
         run: npm run smoke
 
+      - name: Manifest V3 package check
+        run: npm run check:extension
+
       - name: Diagnose Gemini hosted-runner route
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

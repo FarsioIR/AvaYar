@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>آوایار</title>
+    <link
+      rel="stylesheet"
+      href="sidepanel.css"
+    />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img
+          src="assets/avayar-mark.png"
+          alt=""
+        />
+        <div>
+          <p>Farsio</p>
+          <h1>آوایار</h1>
+        </div>
+      </header>
+
+      <p class="intro">
+        صفحه را کامل یا خلاصه، با صدای فارسی بشنو.
+      </p>
+
+      <button
+        id="extract"
+        class="primary"
+        type="button"
+      >خواندن صفحه فعلی</button>
+
+      <label>
+        حالت
+        <select id="mode">
+          <option value="full">متن کامل</option>
+          <option value="summary">خلاصه فارسی</option>
+        </select>
+      </label>
+
+      <label>
+        صدا
+        <select id="voice">
+          <option value="female">زن — Sulafat</option>
+          <option value="male">مرد — Iapetus</option>
+        </select>
+      </label>
+
+      <details>
+        <summary>تنظیم سرور Private Beta</summary>
+        <label>
+          آدرس API
+          <input
+            id="apiBase"
+            type="url"
+            value="http://127.0.0.1:4173"
+          />
+        </label>
+        <button
+          id="saveSettings"
+          type="button"
+        >ذخیره</button>
+      </details>
+
+      <p
+        id="status"
+        role="status"
+      >برای شروع، دکمه خواندن صفحه را بزنید.</p>
+
+      <article>
+        <h2 id="title">هنوز صفحه‌ای انتخاب نشده</h2>
+        <div id="output"></div>
+      </article>
+
+      <div class="controls">
+        <button id="play" disabled>پخش</button>
+        <button id="pause" disabled>مکث</button>
+        <button id="stop" disabled>توقف</button>
+      </div>
+
+      <audio id="audio"></audio>
+    </main>
+    <script
+      type="module"
+      src="sidepanel.mjs"
+    ></script>
+  </body>
+</html>
