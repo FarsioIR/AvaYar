@@ -1,27 +1,29 @@
 {
   "name": "avayar-farsio-runtime",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Executable foundation for AvaYar, a Farsio product.",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.21.0"
   },
   "scripts": {
-    "dev": "node scripts/dev-server.mjs",
+    "dev": "node scripts/start-avayar.mjs",
     "lint": "node scripts/lint.mjs",
     "test": "node --test",
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
     "check": "npm run lint && npm test && npm run build && npm run smoke",
-    "live:free-provider": "node scripts/live-free-provider-probe.mjs",
-    "live:extract": "node scripts/live-extraction-probe.mjs"
+    "live:translation": "node scripts/live-translation-probe.mjs",
+    "live:speech": "node scripts/live-gemini-speech-probe.mjs",
+    "live:extract": "node scripts/live-extraction-probe.mjs",
+    "dev:windows": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/start-avayar-windows.ps1"
   },
   "dependencies": {
+    "@google/genai": "2.16.0",
     "@huggingface/transformers": "4.2.0",
     "@mozilla/readability": "0.6.0",
     "franc-min": "6.2.0",
-    "jsdom": "30.0.1",
-    "msedge-tts": "2.0.7"
+    "jsdom": "30.0.1"
   }
 }

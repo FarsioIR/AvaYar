@@ -52,11 +52,11 @@ async function loadCapabilities() {
 
     const speech =
       capabilities.speechConfigured
-        ? "صدای فارسی ✓"
-        : "صدا —";
+        ? "Gemini fa-IR ✓"
+        : "Gemini: کلید تنظیم نشده";
 
     elements.providerBadge.textContent =
-      `Keyless: ${translation} / ${speech}`;
+      `${translation} / ${speech}`;
   } catch {
     elements.providerBadge.textContent =
       "Keyless: وضعیت نامشخص";
@@ -220,7 +220,7 @@ elements.playButton.addEventListener(
       });
 
       elements.voiceBadge.textContent =
-        `صدا: ${result.voiceName} / ${result.voiceGender}`;
+        `صدا: ${result.voiceName} / ${result.voiceGender} / fa-IR`;
 
       setStatus(
         "پخش با صدای فارسی شروع شد."

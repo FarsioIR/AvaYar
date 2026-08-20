@@ -1,13 +1,13 @@
 import {
-  getFreeProviderConfig,
+  getProviderConfig,
   getProviderCapabilities
 } from "./config.mjs";
 import {
   LocalM2M100Translator
 } from "./providers/local-m2m100-translator.mjs";
 import {
-  EdgeSpeechSynthesizer
-} from "./providers/edge-speech.mjs";
+  GeminiPersianSpeechSynthesizer
+} from "./providers/gemini-speech.mjs";
 import {
   WebpageExtractor
 } from "./extraction/webpage-extractor.mjs";
@@ -44,7 +44,7 @@ export function createApiHandler({
   env = process.env,
   translationPipelineFactory,
   translationLanguageDetector,
-  ttsFactory,
+  speechFactory,
   webpageExtractorFactory
 } = {}) {
   return async function handleApi(request, response) {
@@ -62,11 +62,7 @@ export function createApiHandler({
         request.method === "GET" &&
         url.pathname === "/api/capabilities"
       ) {
-        json(
-          response,
-          200,
-          getProviderCapabilities(env)
-        );
+        json(response, 200, getProviderCapabilities(env));
         return true;
       }
 
@@ -75,16 +71,11 @@ export function createApiHandler({
         url.pathname === "/api/extract"
       ) {
         const body = await readJson(request);
+        const extractor = webpageExtractorFactory
+          ? webpageExtractorFactory()
+          : new WebpageExtractor();
 
-        const extractor =
-          webpageExtractorFactory
-            ? webpageExtractorFactory()
-            : new WebpageExtractor();
-
-        const result =
-          await extractor.extract(body.url);
-
-        json(response, 200, result);
+        json(response, 200, await extractor.extract(body.url));
         return true;
       }
 
@@ -93,27 +84,23 @@ export function createApiHandler({
         url.pathname === "/api/translate"
       ) {
         const body = await readJson(request);
-        const config = getFreeProviderConfig(env);
+        const config = getProviderConfig(env);
 
-        const translator =
-          new LocalM2M100Translator({
-            config: config.translation,
-            pipelineFactory:
-              translationPipelineFactory,
-            languageDetector:
-              translationLanguageDetector
-          });
+        const translator = new LocalM2M100Translator({
+          config: config.translation,
+          pipelineFactory: translationPipelineFactory,
+          languageDetector: translationLanguageDetector
+        });
 
-        const text =
-          await translator.translateToPersian(
-            body.text,
-            {
-              sourceLanguage:
-                typeof body.sourceLanguage === "string"
-                  ? body.sourceLanguage
-                  : null
-            }
-          );
+        const text = await translator.translateToPersian(
+          body.text,
+          {
+            sourceLanguage:
+              typeof body.sourceLanguage === "string"
+                ? body.sourceLanguage
+                : null
+          }
+        );
 
         json(response, 200, {
           text,
@@ -128,11 +115,21 @@ export function createApiHandler({
         url.pathname === "/api/tts"
       ) {
         const body = await readJson(request);
+        const config = getProviderConfig(env);
 
-        const synthesizer =
-          new EdgeSpeechSynthesizer({
-            ttsFactory
-          });
+        if (!config.speech.apiKey) {
+          throw new Error(
+            "Gemini Persian speech is not configured."
+          );
+        }
+
+        const synthesizer = speechFactory
+          ? speechFactory(config.speech)
+          : new GeminiPersianSpeechSynthesizer({
+              apiKey: config.speech.apiKey,
+              model: config.speech.model,
+              voices: config.speech.voices
+            });
 
         const result = await synthesizer.synthesize({
           text: body.text,
@@ -143,7 +140,12 @@ export function createApiHandler({
           "content-type": result.contentType,
           "cache-control": "no-store",
           "x-avayar-voice-name": result.voice.name,
-          "x-avayar-voice-gender": result.voice.gender
+          "x-avayar-voice-gender": result.voice.gender,
+          "x-avayar-voice-locale": result.voice.locale,
+          "x-avayar-speech-provider": result.provider,
+          "x-avayar-speech-transport": result.transport,
+          "x-avayar-speech-model": result.model,
+          "x-avayar-speech-chunks": String(result.chunkCount)
         });
         response.end(result.audio);
         return true;
