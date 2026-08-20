@@ -7,6 +7,10 @@ npm ci
 npm run check
 ```
 
+Pull-request CI is deterministic and does not consume Gemini quota. Run the
+`Ava Live Gemini` workflow manually before a release; it also runs once daily
+to verify both configured Iranian Persian voices against the real provider.
+
 ## Load unpacked
 
 1. Open `chrome://extensions` or `edge://extensions`.
