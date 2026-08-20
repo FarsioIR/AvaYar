@@ -437,7 +437,10 @@ test(
     );
 
     assert.match(
-      generateCalls[0].contents,
+      generateCalls[0]
+        .contents[0]
+        .parts[0]
+        .text,
       /standard Iranian Persian \(fa-IR\)/u
     );
 
