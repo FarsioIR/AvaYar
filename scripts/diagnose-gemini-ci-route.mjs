@@ -119,21 +119,39 @@ if (!modelsResponse.ok) {
   );
 }
 
-let textModel =
-  models.find(
-    (model) =>
-      model?.name ===
-        "models/gemini-2.5-flash" &&
-      Array.isArray(
-        model
-          ?.supportedGenerationMethods
-      ) &&
+const preferredTextModels =
+  [
+    "models/gemini-flash-latest",
+    "models/gemini-3.7-flash",
+    "models/gemini-3.6-flash",
+    "models/gemini-3.5-flash"
+  ];
+
+const supportsGenerateContent =
+  (model) =>
+    Array.isArray(
       model
-        .supportedGenerationMethods
-        .includes(
-          "generateContent"
+        ?.supportedGenerationMethods
+    ) &&
+    model
+      .supportedGenerationMethods
+      .includes(
+        "generateContent"
+      );
+
+let textModel =
+  preferredTextModels
+    .map(
+      (name) =>
+        models.find(
+          (model) =>
+            model?.name === name &&
+            supportsGenerateContent(
+              model
+            )
         )
-  ) ??
+    )
+    .find(Boolean) ??
   null;
 
 if (!textModel) {
@@ -145,18 +163,15 @@ if (!textModel) {
         !model.name.includes(
           "tts"
         ) &&
+        !/preview|deprecated/i.test(
+          model.name
+        ) &&
         /gemini.*flash/i.test(
           model.name
         ) &&
-        Array.isArray(
+        supportsGenerateContent(
           model
-            ?.supportedGenerationMethods
-        ) &&
-        model
-          .supportedGenerationMethods
-          .includes(
-            "generateContent"
-          )
+        )
     ) ??
     null;
 }
