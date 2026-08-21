@@ -79,6 +79,57 @@ async function currentTab() {
   return tab;
 }
 
+async function ensurePageAccess(
+  tab
+) {
+  if (!tab.url) {
+    throw new Error(
+      "آدرس صفحه در دسترس نیست. صفحه را یک‌بار تازه‌سازی کنید."
+    );
+  }
+
+  const url = new URL(tab.url);
+
+  if (
+    ![
+      "http:",
+      "https:"
+    ].includes(url.protocol)
+  ) {
+    throw new Error(
+      "آوایار فقط روی صفحه‌های عادی وب با آدرس HTTP یا HTTPS اجرا می‌شود."
+    );
+  }
+
+  const originPattern =
+    `${url.origin}/*`;
+  const hasAccess =
+    await chrome.permissions
+      .contains({
+        origins: [
+          originPattern
+        ]
+      });
+
+  if (hasAccess) {
+    return;
+  }
+
+  const granted =
+    await chrome.permissions
+      .request({
+        origins: [
+          originPattern
+        ]
+      });
+
+  if (!granted) {
+    throw new Error(
+      `برای خواندن این صفحه، دسترسی به ${url.hostname} لازم است.`
+    );
+  }
+}
+
 async function extract() {
   elements.extract.disabled = true;
   setStatus(
@@ -88,6 +139,10 @@ async function extract() {
   try {
     const tab =
       await currentTab();
+
+    await ensurePageAccess(
+      tab
+    );
 
     await chrome.scripting
       .executeScript({

@@ -47,6 +47,21 @@ if (
   );
 }
 
+for (const origin of [
+  "http://*/*",
+  "https://*/*"
+]) {
+  if (
+    !manifest
+      .optional_host_permissions
+      ?.includes(origin)
+  ) {
+    throw new Error(
+      `Missing optional page permission: ${origin}`
+    );
+  }
+}
+
 async function artifactText(
   directory
 ) {

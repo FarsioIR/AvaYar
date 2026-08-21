@@ -7,6 +7,7 @@ credentials into the browser.
 
 - The side panel starts extraction only after a user click.
 - `activeTab` and `scripting` replace persistent page access.
+- The first extraction on a site requests optional access only for that origin.
 - The content script is injected on demand and reads visible text only.
 - The service worker is the extension's single backend transport boundary.
 - Gemini and translation credentials remain on the AvaYar server.

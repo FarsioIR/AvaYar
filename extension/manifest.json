@@ -15,6 +15,7 @@
     "https://farsio.ir/*"
   ],
   "optional_host_permissions": [
+    "http://*/*",
     "https://*/*"
   ],
   "background": {
