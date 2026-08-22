@@ -34,7 +34,6 @@ const HARD_NOISE_SELECTOR = [
   "[aria-hidden='true']",
   "[class*='breadcrumb']",
   "[class*='share']",
-  "[class*='social']",
   "[class*='sidebar']",
   "[class*='comment']"
 ].join(",");
@@ -59,7 +58,11 @@ const AD_BOUNDARY_SELECTOR = [
   "[class*='offer']",
   "[class*='coupon']",
   "[class*='related']",
-  "[class*='recommend']"
+  "[class*='recommend']",
+  "[class*='social']",
+  "[id*='social']",
+  "[class*='follow']",
+  "[id*='follow']"
 ].join(",");
 
 function normalizeText(value) {
@@ -139,6 +142,31 @@ function looksLikeAdvertisement(text) {
   );
 }
 
+function looksLikeTerminalBoundary(text) {
+  const value = normalizeText(text).toLowerCase();
+
+  if (!value) {
+    return false;
+  }
+
+  const boundaryPhrases = [
+    "در شبکه های اجتماعی دنبال کنید",
+    "در شبکه‌های اجتماعی دنبال کنید",
+    "ما را در شبکه های اجتماعی دنبال کنید",
+    "ما را در شبکه‌های اجتماعی دنبال کنید",
+    "تابناک را در شبکه های اجتماعی دنبال کنید",
+    "تابناک را در شبکه‌های اجتماعی دنبال کنید",
+    "شبکه های اجتماعی تابناک",
+    "شبکه‌های اجتماعی تابناک",
+    "follow us on social media",
+    "follow us on",
+    "related posts",
+    "recommended for you"
+  ];
+
+  return boundaryPhrases.some((phrase) => value.includes(phrase));
+}
+
 function linkDensity(node, text) {
   const linkText = normalizeText(
     [...node.querySelectorAll("a")]
@@ -150,13 +178,20 @@ function linkDensity(node, text) {
 }
 
 function classifyNode(node) {
-  if (node.closest(HARD_NOISE_SELECTOR)) {
-    return { type: "ignore" };
-  }
-
   const text = normalizeText(node.innerText);
 
   if (!text) {
+    return { type: "ignore" };
+  }
+
+  if (looksLikeTerminalBoundary(text)) {
+    return {
+      type: "boundary",
+      text
+    };
+  }
+
+  if (node.closest(HARD_NOISE_SELECTOR)) {
     return { type: "ignore" };
   }
 
@@ -283,6 +318,7 @@ function fallbackFromParagraphCluster() {
       ({ node, text }) =>
         text.length >= 60 &&
         !looksLikeAdvertisement(text) &&
+        !looksLikeTerminalBoundary(text) &&
         linkDensity(node, text) <= 0.45
     );
 
