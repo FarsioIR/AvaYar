@@ -112,6 +112,35 @@ function commercialSignalCount(text) {
   );
 }
 
+function productClaimSignalCount(text) {
+  const value = normalizeText(text).toLowerCase();
+  const signals = [
+    "شامپو",
+    "کرم",
+    "سرم",
+    "محصول",
+    "درمان دائمی",
+    "درمان قطعی",
+    "رفع سفیدی",
+    "سفیدی مو",
+    "بازگشت رنگ طبیعی",
+    "کاملا طبیعی",
+    "کاملاً طبیعی",
+    "صددرصد طبیعی",
+    "۱۰۰٪ طبیعی",
+    "100% طبیعی",
+    "guaranteed result",
+    "permanent treatment",
+    "100% natural"
+  ];
+
+  return signals.reduce(
+    (count, signal) =>
+      count + (value.includes(signal) ? 1 : 0),
+    0
+  );
+}
+
 function looksLikeAdvertisement(text) {
   const value = normalizeText(text);
 
@@ -120,6 +149,7 @@ function looksLikeAdvertisement(text) {
   }
 
   const signalCount = commercialSignalCount(value);
+  const productClaimCount = productClaimSignalCount(value);
   const emojiCount =
     (value.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
   const exclamationCount =
@@ -129,8 +159,14 @@ function looksLikeAdvertisement(text) {
   const moneyPattern =
     /(?:\d[\d,.٬]*\s*(?:تومان|تومن|ریال|میلیون|هزار)|(?:تومان|تومن|ریال)\s*\d)/u;
 
+  const shortNativePromotion =
+    value.length < 260 &&
+    (productClaimCount >= 2 ||
+      (productClaimCount >= 1 && percentageCount >= 1));
+
   return (
     signalCount >= 2 ||
+    shortNativePromotion ||
     (signalCount >= 1 &&
       (emojiCount >= 2 ||
         exclamationCount >= 2 ||
