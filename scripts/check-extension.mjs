@@ -87,7 +87,7 @@ async function artifactText(
         await artifactText(path)
       );
     } else if (
-      /\.(?:html|json|mjs|css|md)$/u.test(
+      /\.(?:html|json|mjs|js|css|md)$/u.test(
         entry.name
       )
     ) {
@@ -115,6 +115,7 @@ if (/GEMINI_API_KEY|AIza[0-9A-Za-z_-]{20,}/u.test(files)) {
 for (const file of [
   "service-worker.mjs",
   "content-script.mjs",
+  "readability.js",
   "sidepanel.html",
   "sidepanel.mjs",
   "sidepanel.css",
