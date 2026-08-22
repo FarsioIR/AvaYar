@@ -74,6 +74,12 @@ function normalizeText(value) {
     .trim();
 }
 
+function compactText(value) {
+  return normalizeText(value)
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
 function looksLikeTerminalBoundary(text) {
   const value = normalizeText(text).toLowerCase();
   const phrases = [
@@ -174,6 +180,177 @@ function titleFromDocument() {
   );
 }
 
+function blockFromNode(node, text) {
+  const tag = node.tagName?.toUpperCase();
+
+  if (/^H[2-4]$/u.test(tag || "")) {
+    return {
+      type: "heading",
+      level: Number(tag.slice(1)),
+      text
+    };
+  }
+
+  if (tag === "BLOCKQUOTE") {
+    return {
+      type: "quote",
+      text
+    };
+  }
+
+  if (tag === "LI") {
+    return {
+      type: "list-item",
+      text
+    };
+  }
+
+  return {
+    type: "paragraph",
+    text
+  };
+}
+
+function blocksToText(blocks) {
+  return normalizeText(
+    blocks
+      .map((block) => block.text)
+      .join("\n\n")
+  );
+}
+
+function paragraphBlocksFromText(text) {
+  const normalized = normalizeText(text);
+  let pieces = normalized.split(/\n{2,}/u);
+
+  if (pieces.length === 1) {
+    pieces = normalized.split(/\n/u);
+  }
+
+  return pieces
+    .map((piece) => normalizeText(piece))
+    .filter(Boolean)
+    .map((piece) => ({
+      type: "paragraph",
+      text: piece
+    }));
+}
+
+function cleanBlocksFromRoot(root) {
+  removeKnownNoise(root);
+  const nodes = [
+    ...root.querySelectorAll("h2, h3, h4, p, blockquote, li")
+  ];
+  const blocks = [];
+  const seen = new Set();
+  let establishedChars = 0;
+
+  for (const node of nodes) {
+    const text = normalizeText(node.textContent);
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    if (looksLikeTerminalBoundary(text) || looksLikeAdvertisement(text)) {
+      if (establishedChars >= MIN_ARTICLE_CHARS) {
+        break;
+      }
+      continue;
+    }
+
+    if (linkDensity(node, text) > 0.55) {
+      if (establishedChars >= MIN_ARTICLE_CHARS) {
+        break;
+      }
+      continue;
+    }
+
+    const isHeading = /^H[2-4]$/u.test(node.tagName || "");
+    if (!isHeading && text.length < 30) {
+      continue;
+    }
+
+    seen.add(text);
+    blocks.push(blockFromNode(node, text));
+    if (!isHeading) {
+      establishedChars += text.length;
+    }
+  }
+
+  return blocks;
+}
+
+function structuredBlocksFromDom(articleBody) {
+  const bodyCompact = compactText(articleBody);
+  const nodes = [
+    ...document.querySelectorAll("h2, h3, h4, p, blockquote, li")
+  ];
+  const blocks = [];
+  const seen = new Set();
+  let pendingHeading = null;
+  let started = false;
+  let matchedChars = 0;
+
+  for (const node of nodes) {
+    if (
+      node.closest(HARD_NOISE_SELECTOR) ||
+      node.closest(STRONG_NOISE_SELECTOR)
+    ) {
+      continue;
+    }
+
+    const text = normalizeText(node.textContent);
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    if (looksLikeTerminalBoundary(text) || looksLikeAdvertisement(text)) {
+      if (started && matchedChars >= MIN_ARTICLE_CHARS) {
+        break;
+      }
+      pendingHeading = null;
+      continue;
+    }
+
+    const tag = node.tagName?.toUpperCase();
+    if (/^H[2-4]$/u.test(tag || "")) {
+      pendingHeading = blockFromNode(node, text);
+      continue;
+    }
+
+    if (text.length < 30 || linkDensity(node, text) > 0.55) {
+      continue;
+    }
+
+    const compact = compactText(text);
+    const probe = compact.length > 160
+      ? compact.slice(0, 160)
+      : compact;
+    const matchesArticle =
+      bodyCompact.includes(compact) ||
+      (probe.length >= 50 && bodyCompact.includes(probe));
+
+    if (!matchesArticle) {
+      continue;
+    }
+
+    if (pendingHeading && !seen.has(pendingHeading.text)) {
+      blocks.push(pendingHeading);
+      seen.add(pendingHeading.text);
+    }
+    pendingHeading = null;
+
+    blocks.push(blockFromNode(node, text));
+    seen.add(text);
+    started = true;
+    matchedChars += text.length;
+  }
+
+  return matchedChars >= MIN_ARTICLE_CHARS
+    ? blocks
+    : [];
+}
+
 function findArticleObject(value, results = []) {
   if (!value || typeof value !== "object") {
     return results;
@@ -188,9 +365,15 @@ function findArticleObject(value, results = []) {
 
   const body = normalizeText(value.articleBody);
   if (body.length >= MIN_ARTICLE_CHARS) {
+    const enrichedBlocks = structuredBlocksFromDom(body);
+    const blocks = enrichedBlocks.length
+      ? enrichedBlocks
+      : paragraphBlocksFromText(body);
+
     results.push({
       title: normalizeText(value.headline || value.name || titleFromDocument()),
-      text: body,
+      text: blocksToText(blocks),
+      blocks,
       method: "json-ld"
     });
   }
@@ -219,47 +402,6 @@ function structuredDataExtraction() {
     .sort((a, b) => b.text.length - a.text.length)[0] || null;
 }
 
-function cleanArticleRoot(root) {
-  removeKnownNoise(root);
-  const nodes = [
-    ...root.querySelectorAll("p, h2, h3, h4, blockquote, li")
-  ];
-  const chunks = [];
-  const seen = new Set();
-  let establishedChars = 0;
-
-  for (const node of nodes) {
-    const text = normalizeText(node.textContent);
-    if (!text || seen.has(text)) {
-      continue;
-    }
-
-    if (looksLikeTerminalBoundary(text) || looksLikeAdvertisement(text)) {
-      if (establishedChars >= MIN_ARTICLE_CHARS) {
-        break;
-      }
-      continue;
-    }
-
-    if (linkDensity(node, text) > 0.55) {
-      if (establishedChars >= MIN_ARTICLE_CHARS) {
-        break;
-      }
-      continue;
-    }
-
-    if (text.length < 30) {
-      continue;
-    }
-
-    seen.add(text);
-    chunks.push(text);
-    establishedChars += text.length;
-  }
-
-  return normalizeText(chunks.join("\n\n"));
-}
-
 function readabilityExtraction() {
   if (typeof globalThis.Readability !== "function") {
     return null;
@@ -283,9 +425,13 @@ function readabilityExtraction() {
   }
 
   const parsedDocument = new DOMParser().parseFromString(parsed.content, "text/html");
-  const cleaned = cleanArticleRoot(parsedDocument.body);
-  const fallbackText = normalizeText(parsed.textContent);
-  const text = cleaned.length >= MIN_ARTICLE_CHARS ? cleaned : fallbackText;
+  let blocks = cleanBlocksFromRoot(parsedDocument.body);
+  let text = blocksToText(blocks);
+
+  if (text.length < MIN_ARTICLE_CHARS) {
+    text = normalizeText(parsed.textContent);
+    blocks = paragraphBlocksFromText(text);
+  }
 
   if (text.length < MIN_ARTICLE_CHARS) {
     return null;
@@ -294,31 +440,37 @@ function readabilityExtraction() {
   return {
     title: normalizeText(parsed.title || titleFromDocument()),
     text,
+    blocks,
     method: "readability"
   };
 }
 
 function bestContiguousSegment(root) {
   const nodes = [
-    ...root.querySelectorAll("p, h2, h3, h4, blockquote, li")
+    ...root.querySelectorAll("h2, h3, h4, p, blockquote, li")
   ];
   const segments = [];
   let current = [];
+  let currentChars = 0;
   const seen = new Set();
 
   function flush() {
     if (!current.length) {
       return;
     }
-    const text = normalizeText(current.join("\n\n"));
+
+    const text = blocksToText(current);
     if (text.length >= MIN_ARTICLE_CHARS) {
       const punctuation = (text.match(/[.!?؟؛:]/gu) || []).length;
       segments.push({
+        blocks: current,
         text,
         score: text.length + current.length * 220 + punctuation * 24
       });
     }
+
     current = [];
+    currentChars = 0;
   }
 
   for (const node of nodes) {
@@ -342,12 +494,14 @@ function bestContiguousSegment(root) {
       continue;
     }
 
-    if (text.length < 35) {
+    const isHeading = /^H[2-4]$/u.test(node.tagName || "");
+    if (!isHeading && text.length < 35) {
       continue;
     }
 
     const sentenceSignals = (text.match(/[.!?؟؛:]/gu) || []).length;
     const articleLike =
+      isHeading ||
       text.length >= 90 ||
       sentenceSignals >= 1 ||
       ["P", "BLOCKQUOTE"].includes(node.tagName);
@@ -357,7 +511,10 @@ function bestContiguousSegment(root) {
     }
 
     seen.add(text);
-    current.push(text);
+    current.push(blockFromNode(node, text));
+    if (!isHeading) {
+      currentChars += text.length;
+    }
   }
 
   flush();
@@ -377,6 +534,7 @@ function semanticExtraction() {
       return {
         title: normalizeText(element.querySelector("h1")?.textContent || titleFromDocument()),
         text: segment.text,
+        blocks: segment.blocks,
         method: "semantic",
         score: segment.score + semanticBonus
       };
@@ -425,6 +583,7 @@ function densityClusterExtraction() {
       return {
         title: normalizeText(element.querySelector?.("h1")?.textContent || titleFromDocument()),
         text: segment.text,
+        blocks: segment.blocks,
         method: "density-cluster",
         score:
           segment.score +
@@ -440,6 +599,31 @@ function densityClusterExtraction() {
   return ranked[0] || null;
 }
 
+function truncateBlocks(blocks, maxChars) {
+  const result = [];
+  let used = 0;
+
+  for (const block of blocks) {
+    if (used >= maxChars) {
+      break;
+    }
+
+    const remaining = maxChars - used;
+    const text = block.text.slice(0, remaining).trim();
+    if (!text) {
+      continue;
+    }
+
+    result.push({
+      ...block,
+      text
+    });
+    used += text.length + 2;
+  }
+
+  return result;
+}
+
 function extractReadableText() {
   const selected =
     structuredDataExtraction() ||
@@ -451,14 +635,19 @@ function extractReadableText() {
     throw new Error("متن اصلی مقاله در این صفحه با اطمینان کافی پیدا نشد.");
   }
 
+  const blocks = selected.blocks?.length
+    ? selected.blocks
+    : paragraphBlocksFromText(selected.text);
   const truncated = selected.text.length > MAX_EXTRACTED_CHARS;
+  const finalBlocks = truncated
+    ? truncateBlocks(blocks, MAX_EXTRACTED_CHARS)
+    : blocks;
 
   return {
     title: selected.title,
     url: location.href,
-    text: truncated
-      ? selected.text.slice(0, MAX_EXTRACTED_CHARS)
-      : selected.text,
+    text: blocksToText(finalBlocks),
+    blocks: finalBlocks,
     truncated,
     extractionMethod: selected.method
   };
