@@ -131,10 +131,8 @@ function looksLikeAdvertisement(text) {
     return false;
   }
 
-  const commercialSignals =
-    commercialSignalCount(value);
-  const productClaims =
-    productClaimSignalCount(value);
+  const commercialSignals = commercialSignalCount(value);
+  const productClaims = productClaimSignalCount(value);
   const emojiCount =
     (value.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
   const exclamationCount =
@@ -173,9 +171,7 @@ function looksLikeTerminalBoundary(text) {
     "پیشنهاد برای شما"
   ];
 
-  return phrases.some(
-    (phrase) => value.includes(phrase)
-  );
+  return phrases.some((phrase) => value.includes(phrase));
 }
 
 function linkDensity(node, text) {
@@ -185,9 +181,7 @@ function linkDensity(node, text) {
       .join(" ")
   );
 
-  return text.length
-    ? linkText.length / text.length
-    : 1;
+  return text.length ? linkText.length / text.length : 1;
 }
 
 function removeKnownNoise(root) {
@@ -204,9 +198,7 @@ function cleanArticleRoot(root) {
   removeKnownNoise(root);
 
   const nodes = [
-    ...root.querySelectorAll(
-      "p, h2, h3, h4, blockquote, li"
-    )
+    ...root.querySelectorAll("p, h2, h3, h4, blockquote, li")
   ];
   const chunks = [];
   const seen = new Set();
@@ -219,10 +211,7 @@ function cleanArticleRoot(root) {
       continue;
     }
 
-    if (
-      looksLikeTerminalBoundary(text) ||
-      looksLikeAdvertisement(text)
-    ) {
+    if (looksLikeTerminalBoundary(text) || looksLikeAdvertisement(text)) {
       if (establishedChars >= MIN_ARTICLE_CHARS) {
         break;
       }
@@ -261,13 +250,10 @@ function readabilityExtraction() {
   let parsed;
 
   try {
-    parsed = new globalThis.Readability(
-      clone,
-      {
-        charThreshold: MIN_ARTICLE_CHARS,
-        keepClasses: false
-      }
-    ).parse();
+    parsed = new globalThis.Readability(clone, {
+      charThreshold: MIN_ARTICLE_CHARS,
+      keepClasses: false
+    }).parse();
   } catch {
     return null;
   }
@@ -276,16 +262,13 @@ function readabilityExtraction() {
     return null;
   }
 
-  const parsedDocument =
-    new DOMParser().parseFromString(
-      parsed.content,
-      "text/html"
-    );
+  const parsedDocument = new DOMParser().parseFromString(
+    parsed.content,
+    "text/html"
+  );
 
-  const cleaned =
-    cleanArticleRoot(parsedDocument.body);
-  const fallbackText =
-    normalizeText(parsed.textContent);
+  const cleaned = cleanArticleRoot(parsedDocument.body);
+  const fallbackText = normalizeText(parsed.textContent);
   const text =
     cleaned.length >= MIN_ARTICLE_CHARS
       ? cleaned
@@ -298,9 +281,9 @@ function readabilityExtraction() {
   return {
     title: normalizeText(
       parsed.title ||
-      document.querySelector("h1")?.textContent ||
-      document.title ||
-      location.hostname
+        document.querySelector("h1")?.textContent ||
+        document.title ||
+        location.hostname
     ),
     text,
     method: "readability"
@@ -324,10 +307,7 @@ function classifyFallbackNode(node) {
     looksLikeAdvertisement(text) ||
     linkDensity(node, text) > 0.62
   ) {
-    return {
-      type: "boundary",
-      text
-    };
+    return { type: "boundary", text };
   }
 
   if (text.length < 35) {
@@ -348,9 +328,7 @@ function classifyFallbackNode(node) {
 
 function bestContiguousSegment(root) {
   const nodes = [
-    ...root.querySelectorAll(
-      "p, h2, h3, h4, blockquote, li"
-    )
+    ...root.querySelectorAll("p, h2, h3, h4, blockquote, li")
   ];
   const segments = [];
   let current = [];
@@ -361,9 +339,7 @@ function bestContiguousSegment(root) {
       return;
     }
 
-    const text = normalizeText(
-      current.join("\n\n")
-    );
+    const text = normalizeText(current.join("\n\n"));
 
     if (text.length >= MIN_ARTICLE_CHARS) {
       const punctuation =
@@ -388,10 +364,7 @@ function bestContiguousSegment(root) {
       continue;
     }
 
-    if (
-      result.type !== "content" ||
-      seen.has(result.text)
-    ) {
+    if (result.type !== "content" || seen.has(result.text)) {
       continue;
     }
 
@@ -401,22 +374,28 @@ function bestContiguousSegment(root) {
 
   flush();
 
-  return segments.sort(
-    (a, b) => b.score - a.score
-  )[0] || null;
+  return segments.sort((a, b) => b.score - a.score)[0] || null;
+}
+
+function articleTitle(element) {
+  const heading = element?.querySelector?.("h1");
+  const metaTitle = document
+    .querySelector("meta[property='og:title']")
+    ?.getAttribute("content");
+
+  return normalizeText(
+    heading?.textContent ||
+      metaTitle ||
+      document.querySelector("h1")?.textContent ||
+      document.title ||
+      location.hostname
+  );
 }
 
 function heuristicExtraction() {
   const candidates = ARTICLE_SELECTORS
-    .flatMap(
-      (selector) => [
-        ...document.querySelectorAll(selector)
-      ]
-    )
-    .filter(
-      (element, index, all) =>
-        all.indexOf(element) === index
-    )
+    .flatMap((selector) => [...document.querySelectorAll(selector)])
+    .filter((element, index, all) => all.indexOf(element) === index)
     .map((element) => {
       const segment = bestContiguousSegment(element);
       const semanticBonus = element.matches(
@@ -442,51 +421,121 @@ function heuristicExtraction() {
     return null;
   }
 
-  const heading =
-    selected.element.querySelector("h1");
-  const metaTitle =
-    document
-      .querySelector("meta[property='og:title']")
-      ?.getAttribute("content");
-
   return {
-    title: normalizeText(
-      heading?.textContent ||
-      metaTitle ||
-      document.querySelector("h1")?.textContent ||
-      document.title ||
-      location.hostname
-    ),
+    title: articleTitle(selected.element),
     text: selected.text,
     method: "heuristic"
+  };
+}
+
+function densityClusterExtraction() {
+  const paragraphNodes = [
+    ...document.querySelectorAll("p, blockquote")
+  ].filter((node) => {
+    if (
+      node.closest(HARD_NOISE_SELECTOR) ||
+      node.closest(STRONG_NOISE_SELECTOR)
+    ) {
+      return false;
+    }
+
+    const text = normalizeText(node.textContent);
+
+    return (
+      text.length >= 50 &&
+      !looksLikeAdvertisement(text) &&
+      !looksLikeTerminalBoundary(text) &&
+      linkDensity(node, text) <= 0.5
+    );
+  });
+
+  if (!paragraphNodes.length) {
+    return null;
+  }
+
+  const parentStats = new Map();
+
+  for (const node of paragraphNodes) {
+    const text = normalizeText(node.textContent);
+    let parent = node.parentElement;
+
+    for (let depth = 0; parent && depth < 6; depth += 1) {
+      if (
+        parent.matches?.(HARD_NOISE_SELECTOR) ||
+        parent.matches?.(STRONG_NOISE_SELECTOR)
+      ) {
+        break;
+      }
+
+      const current = parentStats.get(parent) || {
+        chars: 0,
+        paragraphs: 0
+      };
+
+      current.chars += text.length;
+      current.paragraphs += 1;
+      parentStats.set(parent, current);
+      parent = parent.parentElement;
+    }
+  }
+
+  const ranked = [...parentStats.entries()]
+    .map(([element, stats]) => {
+      const segment = bestContiguousSegment(element);
+
+      if (!segment) {
+        return null;
+      }
+
+      const headingBonus = element.querySelector?.("h1") ? 900 : 0;
+      const paragraphBonus = Math.min(stats.paragraphs, 24) * 120;
+
+      return {
+        element,
+        text: segment.text,
+        score:
+          segment.score +
+          stats.chars * 0.35 +
+          paragraphBonus +
+          headingBonus
+      };
+    })
+    .filter(Boolean)
+    .filter(({ text }) => text.length >= MIN_ARTICLE_CHARS)
+    .sort((a, b) => b.score - a.score);
+
+  const selected = ranked[0];
+
+  if (!selected) {
+    return null;
+  }
+
+  return {
+    title: articleTitle(selected.element),
+    text: selected.text,
+    method: "density-cluster"
   };
 }
 
 function extractReadableText() {
   const selected =
     readabilityExtraction() ||
-    heuristicExtraction();
+    heuristicExtraction() ||
+    densityClusterExtraction();
 
-  if (
-    !selected ||
-    selected.text.length < MIN_ARTICLE_CHARS
-  ) {
+  if (!selected || selected.text.length < MIN_ARTICLE_CHARS) {
     throw new Error(
       "متن اصلی مقاله در این صفحه با اطمینان کافی پیدا نشد."
     );
   }
 
-  const truncated =
-    selected.text.length > MAX_EXTRACTED_CHARS;
+  const truncated = selected.text.length > MAX_EXTRACTED_CHARS;
 
   return {
     title: selected.title,
     url: location.href,
     text: truncated
-      ? selected.text.slice(
-          0,
-          MAX_EXTRACTED_CHARS
-        )
+      ? selected.text.slice(0, MAX_EXTRACTED_CHARS)
       : selected.text,
     truncated,
     extractionMethod: selected.method
@@ -497,15 +546,8 @@ if (!globalThis.__AVAYAR_EXTRACTOR_INSTALLED__) {
   globalThis.__AVAYAR_EXTRACTOR_INSTALLED__ = true;
 
   chrome.runtime.onMessage.addListener(
-    (
-      message,
-      _sender,
-      sendResponse
-    ) => {
-      if (
-        message?.type !==
-        "AVAYAR_EXTRACT"
-      ) {
+    (message, _sender, sendResponse) => {
+      if (message?.type !== "AVAYAR_EXTRACT") {
         return false;
       }
 
