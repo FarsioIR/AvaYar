@@ -25,6 +25,14 @@ await cp(source, target, {
 });
 
 await cp(
+  resolve(
+    root,
+    "node_modules/@mozilla/readability/Readability.js"
+  ),
+  resolve(target, "readability.js")
+);
+
+await cp(
   resolve(root, "src/core"),
   resolve(target, "core"),
   {
