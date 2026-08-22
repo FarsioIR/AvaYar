@@ -2,6 +2,9 @@ import {
   summarizePersian
 } from "./core/summary.mjs";
 
+const ACTIVE_PAGE_CONTEXT =
+  "activePageContext";
+
 const elements = {
   extract:
     document.querySelector("#extract"),
@@ -76,7 +79,30 @@ async function currentTab() {
     );
   }
 
-  return tab;
+  if (tab.url) {
+    return tab;
+  }
+
+  const stored =
+    await chrome.storage.session.get(
+      ACTIVE_PAGE_CONTEXT
+    );
+  const context =
+    stored[ACTIVE_PAGE_CONTEXT];
+
+  if (
+    context?.tabId === tab.id &&
+    context.url
+  ) {
+    return {
+      ...tab,
+      url: context.url
+    };
+  }
+
+  throw new Error(
+    "دسترسی صفحه منقضی شده است. یک‌بار روی آیکن آوایار در نوار ابزار Chrome کلیک کنید و دوباره «خواندن صفحه فعلی» را بزنید."
+  );
 }
 
 async function ensurePageAccess(
@@ -84,7 +110,7 @@ async function ensurePageAccess(
 ) {
   if (!tab.url) {
     throw new Error(
-      "آدرس صفحه در دسترس نیست. صفحه را یک‌بار تازه‌سازی کنید."
+      "آدرس صفحه در دسترس نیست."
     );
   }
 
