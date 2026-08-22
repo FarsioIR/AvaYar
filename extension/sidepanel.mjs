@@ -176,6 +176,7 @@ async function extract() {
           tabId: tab.id
         },
         files: [
+          "readability.js",
           "content-script.mjs"
         ]
       });
