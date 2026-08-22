@@ -1,4 +1,5 @@
 const MAX_EXTRACTED_CHARS = 80_000;
+const MIN_ARTICLE_CHARS = 180;
 
 const ARTICLE_SELECTORS = [
   "article",
@@ -34,11 +35,13 @@ const HARD_NOISE_SELECTOR = [
   "[aria-hidden='true']",
   "[class*='breadcrumb']",
   "[class*='share']",
+  "[id*='share']",
   "[class*='sidebar']",
-  "[class*='comment']"
+  "[class*='comment']",
+  "[id*='comment']"
 ].join(",");
 
-const AD_BOUNDARY_SELECTOR = [
+const STRONG_NOISE_SELECTOR = [
   "[class*='advert']",
   "[id*='advert']",
   "[class*='advertisement']",
@@ -51,14 +54,10 @@ const AD_BOUNDARY_SELECTOR = [
   "[class*='promo']",
   "[id*='promo']",
   "[class*='promotion']",
-  "[class*='banner']",
-  "[id*='banner']",
-  "[class*='shopping']",
-  "[class*='product']",
-  "[class*='offer']",
-  "[class*='coupon']",
   "[class*='related']",
+  "[id*='related']",
   "[class*='recommend']",
+  "[id*='recommend']",
   "[class*='social']",
   "[id*='social']",
   "[class*='follow']",
@@ -78,28 +77,19 @@ function normalizeText(value) {
 function commercialSignalCount(text) {
   const value = normalizeText(text).toLowerCase();
   const signals = [
-    "خرید",
-    "تخفیف",
-    "قیمت",
-    "تومان",
-    "تومن",
     "ثبت سفارش",
     "سفارش دهید",
     "تماس بگیرید",
     "ارسال رایگان",
     "فروش ویژه",
-    "همین حالا",
-    "کلیک کنید",
+    "همین حالا خرید",
     "مشاهده محصول",
-    "درمان در منزل",
-    "ماهی فقط",
     "پرداخت اقساطی",
     "buy now",
     "shop now",
     "order now",
     "special offer",
     "limited offer",
-    "discount",
     "free shipping",
     "sponsored",
     "advertisement"
@@ -115,17 +105,10 @@ function commercialSignalCount(text) {
 function productClaimSignalCount(text) {
   const value = normalizeText(text).toLowerCase();
   const signals = [
-    "شامپو",
-    "کرم",
-    "سرم",
-    "محصول",
     "درمان دائمی",
     "درمان قطعی",
     "رفع سفیدی",
-    "سفیدی مو",
     "بازگشت رنگ طبیعی",
-    "کاملا طبیعی",
-    "کاملاً طبیعی",
     "صددرصد طبیعی",
     "۱۰۰٪ طبیعی",
     "100% طبیعی",
@@ -148,8 +131,10 @@ function looksLikeAdvertisement(text) {
     return false;
   }
 
-  const signalCount = commercialSignalCount(value);
-  const productClaimCount = productClaimSignalCount(value);
+  const commercialSignals =
+    commercialSignalCount(value);
+  const productClaims =
+    productClaimSignalCount(value);
   const emojiCount =
     (value.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
   const exclamationCount =
@@ -157,24 +142,14 @@ function looksLikeAdvertisement(text) {
   const percentageCount =
     (value.match(/\d+\s*(?:%|٪)/gu) || []).length;
   const moneyPattern =
-    /(?:\d[\d,.٬]*\s*(?:تومان|تومن|ریال|میلیون|هزار)|(?:تومان|تومن|ریال)\s*\d)/u;
-
-  const shortNativePromotion =
-    value.length < 260 &&
-    (productClaimCount >= 2 ||
-      (productClaimCount >= 1 && percentageCount >= 1));
+    /(?:\d[\d,.٬]*\s*(?:تومان|تومن|ریال)|(?:تومان|تومن|ریال)\s*\d)/u;
 
   return (
-    signalCount >= 2 ||
-    shortNativePromotion ||
-    (signalCount >= 1 &&
-      (emojiCount >= 2 ||
-        exclamationCount >= 2 ||
-        percentageCount >= 1 ||
-        moneyPattern.test(value))) ||
-    (value.length < 320 &&
-      (emojiCount >= 3 ||
-        (moneyPattern.test(value) && exclamationCount >= 1)))
+    commercialSignals >= 1 ||
+    (value.length < 280 && productClaims >= 1 && percentageCount >= 1) ||
+    (value.length < 220 && productClaims >= 2) ||
+    (value.length < 260 && emojiCount >= 3) ||
+    (value.length < 260 && moneyPattern.test(value) && exclamationCount >= 1)
   );
 }
 
@@ -185,57 +160,170 @@ function looksLikeTerminalBoundary(text) {
     return false;
   }
 
-  const boundaryPhrases = [
+  const phrases = [
     "در شبکه های اجتماعی دنبال کنید",
     "در شبکه‌های اجتماعی دنبال کنید",
     "ما را در شبکه های اجتماعی دنبال کنید",
     "ما را در شبکه‌های اجتماعی دنبال کنید",
-    "تابناک را در شبکه های اجتماعی دنبال کنید",
-    "تابناک را در شبکه‌های اجتماعی دنبال کنید",
-    "شبکه های اجتماعی تابناک",
-    "شبکه‌های اجتماعی تابناک",
     "follow us on social media",
     "follow us on",
     "related posts",
-    "recommended for you"
+    "recommended for you",
+    "مطالب مرتبط",
+    "پیشنهاد برای شما"
   ];
 
-  return boundaryPhrases.some((phrase) => value.includes(phrase));
+  return phrases.some(
+    (phrase) => value.includes(phrase)
+  );
 }
 
 function linkDensity(node, text) {
   const linkText = normalizeText(
     [...node.querySelectorAll("a")]
-      .map((link) => link.innerText)
+      .map((link) => link.textContent)
       .join(" ")
   );
 
-  return text.length ? linkText.length / text.length : 1;
+  return text.length
+    ? linkText.length / text.length
+    : 1;
 }
 
-function classifyNode(node) {
-  const text = normalizeText(node.innerText);
+function removeKnownNoise(root) {
+  for (const node of [
+    ...root.querySelectorAll(
+      `${HARD_NOISE_SELECTOR},${STRONG_NOISE_SELECTOR}`
+    )
+  ]) {
+    node.remove();
+  }
+}
+
+function cleanArticleRoot(root) {
+  removeKnownNoise(root);
+
+  const nodes = [
+    ...root.querySelectorAll(
+      "p, h2, h3, h4, blockquote, li"
+    )
+  ];
+  const chunks = [];
+  const seen = new Set();
+  let establishedChars = 0;
+
+  for (const node of nodes) {
+    const text = normalizeText(node.textContent);
+
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    if (
+      looksLikeTerminalBoundary(text) ||
+      looksLikeAdvertisement(text)
+    ) {
+      if (establishedChars >= MIN_ARTICLE_CHARS) {
+        break;
+      }
+      continue;
+    }
+
+    const density = linkDensity(node, text);
+
+    if (density > 0.55) {
+      if (establishedChars >= MIN_ARTICLE_CHARS) {
+        break;
+      }
+      continue;
+    }
+
+    if (text.length < 30) {
+      continue;
+    }
+
+    seen.add(text);
+    chunks.push(text);
+    establishedChars += text.length;
+  }
+
+  return normalizeText(chunks.join("\n\n"));
+}
+
+function readabilityExtraction() {
+  if (typeof globalThis.Readability !== "function") {
+    return null;
+  }
+
+  const clone = document.cloneNode(true);
+  removeKnownNoise(clone);
+
+  let parsed;
+
+  try {
+    parsed = new globalThis.Readability(
+      clone,
+      {
+        charThreshold: MIN_ARTICLE_CHARS,
+        keepClasses: false
+      }
+    ).parse();
+  } catch {
+    return null;
+  }
+
+  if (!parsed?.content) {
+    return null;
+  }
+
+  const parsedDocument =
+    new DOMParser().parseFromString(
+      parsed.content,
+      "text/html"
+    );
+
+  const cleaned =
+    cleanArticleRoot(parsedDocument.body);
+  const fallbackText =
+    normalizeText(parsed.textContent);
+  const text =
+    cleaned.length >= MIN_ARTICLE_CHARS
+      ? cleaned
+      : fallbackText;
+
+  if (text.length < MIN_ARTICLE_CHARS) {
+    return null;
+  }
+
+  return {
+    title: normalizeText(
+      parsed.title ||
+      document.querySelector("h1")?.textContent ||
+      document.title ||
+      location.hostname
+    ),
+    text,
+    method: "readability"
+  };
+}
+
+function classifyFallbackNode(node) {
+  if (node.closest(HARD_NOISE_SELECTOR)) {
+    return { type: "ignore" };
+  }
+
+  const text = normalizeText(node.textContent);
 
   if (!text) {
     return { type: "ignore" };
   }
 
-  if (looksLikeTerminalBoundary(text)) {
-    return {
-      type: "boundary",
-      text
-    };
-  }
-
-  if (node.closest(HARD_NOISE_SELECTOR)) {
-    return { type: "ignore" };
-  }
-
-  const adContainer = node.closest(AD_BOUNDARY_SELECTOR);
-  const density = linkDensity(node, text);
-  const adLike = looksLikeAdvertisement(text);
-
-  if (adContainer || adLike || density > 0.62) {
+  if (
+    node.closest(STRONG_NOISE_SELECTOR) ||
+    looksLikeTerminalBoundary(text) ||
+    looksLikeAdvertisement(text) ||
+    linkDensity(node, text) > 0.62
+  ) {
     return {
       type: "boundary",
       text
@@ -249,203 +337,194 @@ function classifyNode(node) {
   const sentenceSignals =
     (text.match(/[.!?؟؛:]/gu) || []).length;
 
-  const articleLike =
+  return (
     text.length >= 90 ||
     sentenceSignals >= 1 ||
-    ["P", "BLOCKQUOTE"].includes(node.tagName);
-
-  return articleLike
-    ? {
-        type: "content",
-        text
-      }
+    ["P", "BLOCKQUOTE"].includes(node.tagName)
+  )
+    ? { type: "content", text }
     : { type: "ignore" };
 }
 
-function segmentScore(chunks) {
-  const text = chunks.join("\n\n");
-  const punctuationCount =
-    (text.match(/[.!?؟؛:]/gu) || []).length;
-
-  return {
-    text,
-    score:
-      text.length +
-      chunks.length * 220 +
-      punctuationCount * 24
-  };
-}
-
-function bestContiguousArticleSegment(root) {
+function bestContiguousSegment(root) {
   const nodes = [
-    ...root.querySelectorAll("p, h2, h3, blockquote, li")
+    ...root.querySelectorAll(
+      "p, h2, h3, h4, blockquote, li"
+    )
   ];
-
   const segments = [];
   let current = [];
   const seen = new Set();
 
   function flush() {
-    if (current.length > 0) {
-      segments.push(segmentScore(current));
-      current = [];
+    if (!current.length) {
+      return;
     }
+
+    const text = normalizeText(
+      current.join("\n\n")
+    );
+
+    if (text.length >= MIN_ARTICLE_CHARS) {
+      const punctuation =
+        (text.match(/[.!?؟؛:]/gu) || []).length;
+      segments.push({
+        text,
+        score:
+          text.length +
+          current.length * 220 +
+          punctuation * 24
+      });
+    }
+
+    current = [];
   }
 
   for (const node of nodes) {
-    const classification = classifyNode(node);
+    const result = classifyFallbackNode(node);
 
-    if (classification.type === "boundary") {
+    if (result.type === "boundary") {
       flush();
       continue;
     }
 
-    if (classification.type !== "content") {
+    if (
+      result.type !== "content" ||
+      seen.has(result.text)
+    ) {
       continue;
     }
 
-    if (seen.has(classification.text)) {
-      continue;
-    }
-
-    seen.add(classification.text);
-    current.push(classification.text);
+    seen.add(result.text);
+    current.push(result.text);
   }
 
   flush();
 
-  return segments
-    .filter(({ text }) => text.length >= 180)
-    .sort((left, right) => right.score - left.score)[0] || null;
+  return segments.sort(
+    (a, b) => b.score - a.score
+  )[0] || null;
 }
 
-function scoreCandidate(element) {
-  const segment = bestContiguousArticleSegment(element);
+function heuristicExtraction() {
+  const candidates = ARTICLE_SELECTORS
+    .flatMap(
+      (selector) => [
+        ...document.querySelectorAll(selector)
+      ]
+    )
+    .filter(
+      (element, index, all) =>
+        all.indexOf(element) === index
+    )
+    .map((element) => {
+      const segment = bestContiguousSegment(element);
+      const semanticBonus = element.matches(
+        "article, [itemprop='articleBody']"
+      )
+        ? 1800
+        : 0;
 
-  if (!segment) {
-    return {
-      element,
-      text: "",
-      score: 0
-    };
+      return segment
+        ? {
+            element,
+            text: segment.text,
+            score: segment.score + semanticBonus
+          }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  const selected = candidates[0];
+
+  if (!selected) {
+    return null;
   }
 
-  const semanticBonus =
-    element.matches("article, [itemprop='articleBody']")
-      ? 1800
-      : 0;
+  const heading =
+    selected.element.querySelector("h1");
+  const metaTitle =
+    document
+      .querySelector("meta[property='og:title']")
+      ?.getAttribute("content");
 
   return {
-    element,
-    text: segment.text,
-    score: segment.score + semanticBonus
+    title: normalizeText(
+      heading?.textContent ||
+      metaTitle ||
+      document.querySelector("h1")?.textContent ||
+      document.title ||
+      location.hostname
+    ),
+    text: selected.text,
+    method: "heuristic"
   };
 }
 
-function fallbackFromParagraphCluster() {
-  const paragraphs = [...document.querySelectorAll("p")]
-    .filter((node) => !node.closest(HARD_NOISE_SELECTOR))
-    .filter((node) => !node.closest(AD_BOUNDARY_SELECTOR))
-    .map((node) => ({
-      node,
-      text: normalizeText(node.innerText)
-    }))
-    .filter(
-      ({ node, text }) =>
-        text.length >= 60 &&
-        !looksLikeAdvertisement(text) &&
-        !looksLikeTerminalBoundary(text) &&
-        linkDensity(node, text) <= 0.45
-    );
-
-  const parentScores = new Map();
-
-  for (const { node, text } of paragraphs) {
-    let parent = node.parentElement;
-
-    for (let depth = 0; parent && depth < 4; depth += 1) {
-      parentScores.set(
-        parent,
-        (parentScores.get(parent) || 0) + text.length
-      );
-      parent = parent.parentElement;
-    }
-  }
-
-  return [...parentScores.entries()]
-    .map(([element]) => scoreCandidate(element))
-    .filter(({ text }) => text.length >= 180)
-    .sort((left, right) => right.score - left.score)[0] || null;
-}
-
-function articleTitle(selectedElement) {
-  const heading = selectedElement?.querySelector("h1");
-  const metaTitle = document
-    .querySelector("meta[property='og:title']")
-    ?.getAttribute("content");
-
-  return normalizeText(
-    heading?.innerText ||
-      metaTitle ||
-      document.querySelector("h1")?.innerText ||
-      document.title ||
-      location.hostname
-  );
-}
-
 function extractReadableText() {
-  const candidates = ARTICLE_SELECTORS
-    .flatMap((selector) => [...document.querySelectorAll(selector)])
-    .filter((element, index, all) => all.indexOf(element) === index)
-    .map(scoreCandidate)
-    .filter(({ text }) => text.length >= 180)
-    .sort((left, right) => right.score - left.score);
+  const selected =
+    readabilityExtraction() ||
+    heuristicExtraction();
 
-  const selected = candidates[0] || fallbackFromParagraphCluster();
-
-  if (!selected || selected.text.length < 180) {
+  if (
+    !selected ||
+    selected.text.length < MIN_ARTICLE_CHARS
+  ) {
     throw new Error(
       "متن اصلی مقاله در این صفحه با اطمینان کافی پیدا نشد."
     );
   }
 
-  const truncated = selected.text.length > MAX_EXTRACTED_CHARS;
+  const truncated =
+    selected.text.length > MAX_EXTRACTED_CHARS;
 
   return {
-    title: articleTitle(selected.element),
+    title: selected.title,
     url: location.href,
     text: truncated
-      ? selected.text.slice(0, MAX_EXTRACTED_CHARS)
+      ? selected.text.slice(
+          0,
+          MAX_EXTRACTED_CHARS
+        )
       : selected.text,
-    truncated
+    truncated,
+    extractionMethod: selected.method
   };
 }
 
-chrome.runtime.onMessage.addListener(
-  (
-    message,
-    _sender,
-    sendResponse
-  ) => {
-    if (message?.type !== "AVAYAR_EXTRACT") {
+if (!globalThis.__AVAYAR_EXTRACTOR_INSTALLED__) {
+  globalThis.__AVAYAR_EXTRACTOR_INSTALLED__ = true;
+
+  chrome.runtime.onMessage.addListener(
+    (
+      message,
+      _sender,
+      sendResponse
+    ) => {
+      if (
+        message?.type !==
+        "AVAYAR_EXTRACT"
+      ) {
+        return false;
+      }
+
+      try {
+        sendResponse({
+          ok: true,
+          result: extractReadableText()
+        });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error)
+        });
+      }
+
       return false;
     }
-
-    try {
-      sendResponse({
-        ok: true,
-        result: extractReadableText()
-      });
-    } catch (error) {
-      sendResponse({
-        ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : String(error)
-      });
-    }
-
-    return false;
-  }
-);
+  );
+}
