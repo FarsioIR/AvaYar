@@ -95,6 +95,18 @@ function normalizedApiBase(value) {
   return url.origin;
 }
 
+function networkErrorMessage(apiBase) {
+  const url = new URL(apiBase);
+  const isLocal = [
+    "127.0.0.1",
+    "localhost"
+  ].includes(url.hostname);
+
+  return isLocal
+    ? "سرور محلی آوایار در دسترس نیست. برای Private Beta ابتدا در پوشه پروژه «npm run dev» را اجرا کنید و سپس دوباره تلاش کنید."
+    : "ارتباط با سرور آوایار برقرار نشد. اتصال شبکه و آدرس سرور را بررسی کنید.";
+}
+
 async function apiRequest({
   path,
   body,
@@ -110,24 +122,39 @@ async function apiRequest({
       stored.apiBase
     );
 
-  const response = await fetch(
-    `${apiBase}${path}`,
-    {
-      method:
-        body ? "POST" : "GET",
-      headers:
-        body
-          ? {
-              "content-type":
-                "application/json"
-            }
-          : undefined,
-      body:
-        body
-          ? JSON.stringify(body)
-          : undefined
+  let response;
+
+  try {
+    response = await fetch(
+      `${apiBase}${path}`,
+      {
+        method:
+          body ? "POST" : "GET",
+        headers:
+          body
+            ? {
+                "content-type":
+                  "application/json"
+              }
+            : undefined,
+        body:
+          body
+            ? JSON.stringify(body)
+            : undefined
+      }
+    );
+  } catch (error) {
+    if (
+      error instanceof TypeError ||
+      error?.message === "Failed to fetch"
+    ) {
+      throw new Error(
+        networkErrorMessage(apiBase)
+      );
     }
-  );
+
+    throw error;
+  }
 
   if (!response.ok) {
     const error =
