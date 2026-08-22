@@ -74,9 +74,30 @@ function normalizeText(value) {
     .trim();
 }
 
-function commercialSignalCount(text) {
+function looksLikeTerminalBoundary(text) {
   const value = normalizeText(text).toLowerCase();
-  const signals = [
+  const phrases = [
+    "در شبکه های اجتماعی دنبال کنید",
+    "در شبکه‌های اجتماعی دنبال کنید",
+    "ما را در شبکه های اجتماعی دنبال کنید",
+    "ما را در شبکه‌های اجتماعی دنبال کنید",
+    "follow us on social media",
+    "follow us on",
+    "related posts",
+    "recommended for you",
+    "مطالب مرتبط",
+    "پیشنهاد برای شما"
+  ];
+  return phrases.some((phrase) => value.includes(phrase));
+}
+
+function looksLikeAdvertisement(text) {
+  const value = normalizeText(text).toLowerCase();
+  if (!value) {
+    return false;
+  }
+
+  const commercialPhrases = [
     "ثبت سفارش",
     "سفارش دهید",
     "تماس بگیرید",
@@ -95,16 +116,11 @@ function commercialSignalCount(text) {
     "advertisement"
   ];
 
-  return signals.reduce(
-    (count, signal) =>
-      count + (value.includes(signal) ? 1 : 0),
-    0
-  );
-}
+  if (commercialPhrases.some((phrase) => value.includes(phrase))) {
+    return true;
+  }
 
-function productClaimSignalCount(text) {
-  const value = normalizeText(text).toLowerCase();
-  const signals = [
+  const productClaims = [
     "درمان دائمی",
     "درمان قطعی",
     "رفع سفیدی",
@@ -115,63 +131,18 @@ function productClaimSignalCount(text) {
     "guaranteed result",
     "permanent treatment",
     "100% natural"
-  ];
+  ].filter((phrase) => value.includes(phrase)).length;
 
-  return signals.reduce(
-    (count, signal) =>
-      count + (value.includes(signal) ? 1 : 0),
-    0
-  );
-}
-
-function looksLikeAdvertisement(text) {
-  const value = normalizeText(text);
-
-  if (!value) {
-    return false;
-  }
-
-  const commercialSignals = commercialSignalCount(value);
-  const productClaims = productClaimSignalCount(value);
-  const emojiCount =
-    (value.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
-  const exclamationCount =
-    (value.match(/[!❗❌]/gu) || []).length;
-  const percentageCount =
-    (value.match(/\d+\s*(?:%|٪)/gu) || []).length;
-  const moneyPattern =
-    /(?:\d[\d,.٬]*\s*(?:تومان|تومن|ریال)|(?:تومان|تومن|ریال)\s*\d)/u;
+  const percentCount = (value.match(/\d+\s*(?:%|٪)/gu) || []).length;
+  const emojiCount = (value.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
+  const moneyPattern = /(?:\d[\d,.٬]*\s*(?:تومان|تومن|ریال)|(?:تومان|تومن|ریال)\s*\d)/u;
 
   return (
-    commercialSignals >= 1 ||
-    (value.length < 280 && productClaims >= 1 && percentageCount >= 1) ||
+    (value.length < 280 && productClaims >= 1 && percentCount >= 1) ||
     (value.length < 220 && productClaims >= 2) ||
     (value.length < 260 && emojiCount >= 3) ||
-    (value.length < 260 && moneyPattern.test(value) && exclamationCount >= 1)
+    (value.length < 260 && moneyPattern.test(value) && /[!❗❌]/u.test(value))
   );
-}
-
-function looksLikeTerminalBoundary(text) {
-  const value = normalizeText(text).toLowerCase();
-
-  if (!value) {
-    return false;
-  }
-
-  const phrases = [
-    "در شبکه های اجتماعی دنبال کنید",
-    "در شبکه‌های اجتماعی دنبال کنید",
-    "ما را در شبکه های اجتماعی دنبال کنید",
-    "ما را در شبکه‌های اجتماعی دنبال کنید",
-    "follow us on social media",
-    "follow us on",
-    "related posts",
-    "recommended for you",
-    "مطالب مرتبط",
-    "پیشنهاد برای شما"
-  ];
-
-  return phrases.some((phrase) => value.includes(phrase));
 }
 
 function linkDensity(node, text) {
@@ -180,23 +151,76 @@ function linkDensity(node, text) {
       .map((link) => link.textContent)
       .join(" ")
   );
-
   return text.length ? linkText.length / text.length : 1;
 }
 
 function removeKnownNoise(root) {
   for (const node of [
-    ...root.querySelectorAll(
-      `${HARD_NOISE_SELECTOR},${STRONG_NOISE_SELECTOR}`
-    )
+    ...root.querySelectorAll(`${HARD_NOISE_SELECTOR},${STRONG_NOISE_SELECTOR}`)
   ]) {
     node.remove();
   }
 }
 
+function titleFromDocument() {
+  const metaTitle = document
+    .querySelector("meta[property='og:title']")
+    ?.getAttribute("content");
+  return normalizeText(
+    metaTitle ||
+      document.querySelector("h1")?.textContent ||
+      document.title ||
+      location.hostname
+  );
+}
+
+function findArticleObject(value, results = []) {
+  if (!value || typeof value !== "object") {
+    return results;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      findArticleObject(item, results);
+    }
+    return results;
+  }
+
+  const body = normalizeText(value.articleBody);
+  if (body.length >= MIN_ARTICLE_CHARS) {
+    results.push({
+      title: normalizeText(value.headline || value.name || titleFromDocument()),
+      text: body,
+      method: "json-ld"
+    });
+  }
+
+  for (const child of Object.values(value)) {
+    findArticleObject(child, results);
+  }
+
+  return results;
+}
+
+function structuredDataExtraction() {
+  const candidates = [];
+
+  for (const script of document.querySelectorAll("script[type='application/ld+json']")) {
+    try {
+      const parsed = JSON.parse(script.textContent || "null");
+      findArticleObject(parsed, candidates);
+    } catch {
+      // Ignore malformed structured data blocks.
+    }
+  }
+
+  return candidates
+    .filter(({ text }) => !looksLikeAdvertisement(text))
+    .sort((a, b) => b.text.length - a.text.length)[0] || null;
+}
+
 function cleanArticleRoot(root) {
   removeKnownNoise(root);
-
   const nodes = [
     ...root.querySelectorAll("p, h2, h3, h4, blockquote, li")
   ];
@@ -206,7 +230,6 @@ function cleanArticleRoot(root) {
 
   for (const node of nodes) {
     const text = normalizeText(node.textContent);
-
     if (!text || seen.has(text)) {
       continue;
     }
@@ -218,9 +241,7 @@ function cleanArticleRoot(root) {
       continue;
     }
 
-    const density = linkDensity(node, text);
-
-    if (density > 0.55) {
+    if (linkDensity(node, text) > 0.55) {
       if (establishedChars >= MIN_ARTICLE_CHARS) {
         break;
       }
@@ -248,7 +269,6 @@ function readabilityExtraction() {
   removeKnownNoise(clone);
 
   let parsed;
-
   try {
     parsed = new globalThis.Readability(clone, {
       charThreshold: MIN_ARTICLE_CHARS,
@@ -262,68 +282,20 @@ function readabilityExtraction() {
     return null;
   }
 
-  const parsedDocument = new DOMParser().parseFromString(
-    parsed.content,
-    "text/html"
-  );
-
+  const parsedDocument = new DOMParser().parseFromString(parsed.content, "text/html");
   const cleaned = cleanArticleRoot(parsedDocument.body);
   const fallbackText = normalizeText(parsed.textContent);
-  const text =
-    cleaned.length >= MIN_ARTICLE_CHARS
-      ? cleaned
-      : fallbackText;
+  const text = cleaned.length >= MIN_ARTICLE_CHARS ? cleaned : fallbackText;
 
   if (text.length < MIN_ARTICLE_CHARS) {
     return null;
   }
 
   return {
-    title: normalizeText(
-      parsed.title ||
-        document.querySelector("h1")?.textContent ||
-        document.title ||
-        location.hostname
-    ),
+    title: normalizeText(parsed.title || titleFromDocument()),
     text,
     method: "readability"
   };
-}
-
-function classifyFallbackNode(node) {
-  if (node.closest(HARD_NOISE_SELECTOR)) {
-    return { type: "ignore" };
-  }
-
-  const text = normalizeText(node.textContent);
-
-  if (!text) {
-    return { type: "ignore" };
-  }
-
-  if (
-    node.closest(STRONG_NOISE_SELECTOR) ||
-    looksLikeTerminalBoundary(text) ||
-    looksLikeAdvertisement(text) ||
-    linkDensity(node, text) > 0.62
-  ) {
-    return { type: "boundary", text };
-  }
-
-  if (text.length < 35) {
-    return { type: "ignore" };
-  }
-
-  const sentenceSignals =
-    (text.match(/[.!?؟؛:]/gu) || []).length;
-
-  return (
-    text.length >= 90 ||
-    sentenceSignals >= 1 ||
-    ["P", "BLOCKQUOTE"].includes(node.tagName)
-  )
-    ? { type: "content", text }
-    : { type: "ignore" };
 }
 
 function bestContiguousSegment(root) {
@@ -338,140 +310,105 @@ function bestContiguousSegment(root) {
     if (!current.length) {
       return;
     }
-
     const text = normalizeText(current.join("\n\n"));
-
     if (text.length >= MIN_ARTICLE_CHARS) {
-      const punctuation =
-        (text.match(/[.!?؟؛:]/gu) || []).length;
+      const punctuation = (text.match(/[.!?؟؛:]/gu) || []).length;
       segments.push({
         text,
-        score:
-          text.length +
-          current.length * 220 +
-          punctuation * 24
+        score: text.length + current.length * 220 + punctuation * 24
       });
     }
-
     current = [];
   }
 
   for (const node of nodes) {
-    const result = classifyFallbackNode(node);
+    if (node.closest(HARD_NOISE_SELECTOR)) {
+      continue;
+    }
 
-    if (result.type === "boundary") {
+    const text = normalizeText(node.textContent);
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    const isBoundary =
+      node.closest(STRONG_NOISE_SELECTOR) ||
+      looksLikeTerminalBoundary(text) ||
+      looksLikeAdvertisement(text) ||
+      linkDensity(node, text) > 0.62;
+
+    if (isBoundary) {
       flush();
       continue;
     }
 
-    if (result.type !== "content" || seen.has(result.text)) {
+    if (text.length < 35) {
       continue;
     }
 
-    seen.add(result.text);
-    current.push(result.text);
+    const sentenceSignals = (text.match(/[.!?؟؛:]/gu) || []).length;
+    const articleLike =
+      text.length >= 90 ||
+      sentenceSignals >= 1 ||
+      ["P", "BLOCKQUOTE"].includes(node.tagName);
+
+    if (!articleLike) {
+      continue;
+    }
+
+    seen.add(text);
+    current.push(text);
   }
 
   flush();
-
   return segments.sort((a, b) => b.score - a.score)[0] || null;
 }
 
-function articleTitle(element) {
-  const heading = element?.querySelector?.("h1");
-  const metaTitle = document
-    .querySelector("meta[property='og:title']")
-    ?.getAttribute("content");
-
-  return normalizeText(
-    heading?.textContent ||
-      metaTitle ||
-      document.querySelector("h1")?.textContent ||
-      document.title ||
-      location.hostname
-  );
-}
-
-function heuristicExtraction() {
-  const candidates = ARTICLE_SELECTORS
+function semanticExtraction() {
+  const ranked = ARTICLE_SELECTORS
     .flatMap((selector) => [...document.querySelectorAll(selector)])
     .filter((element, index, all) => all.indexOf(element) === index)
     .map((element) => {
       const segment = bestContiguousSegment(element);
-      const semanticBonus = element.matches(
-        "article, [itemprop='articleBody']"
-      )
-        ? 1800
-        : 0;
-
-      return segment
-        ? {
-            element,
-            text: segment.text,
-            score: segment.score + semanticBonus
-          }
-        : null;
+      if (!segment) {
+        return null;
+      }
+      const semanticBonus = element.matches("article, [itemprop='articleBody']") ? 1800 : 0;
+      return {
+        title: normalizeText(element.querySelector("h1")?.textContent || titleFromDocument()),
+        text: segment.text,
+        method: "semantic",
+        score: segment.score + semanticBonus
+      };
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
 
-  const selected = candidates[0];
-
-  if (!selected) {
-    return null;
-  }
-
-  return {
-    title: articleTitle(selected.element),
-    text: selected.text,
-    method: "heuristic"
-  };
+  return ranked[0] || null;
 }
 
 function densityClusterExtraction() {
-  const paragraphNodes = [
-    ...document.querySelectorAll("p, blockquote")
-  ].filter((node) => {
-    if (
-      node.closest(HARD_NOISE_SELECTOR) ||
-      node.closest(STRONG_NOISE_SELECTOR)
-    ) {
-      return false;
-    }
-
-    const text = normalizeText(node.textContent);
-
-    return (
-      text.length >= 50 &&
-      !looksLikeAdvertisement(text) &&
-      !looksLikeTerminalBoundary(text) &&
-      linkDensity(node, text) <= 0.5
-    );
-  });
-
-  if (!paragraphNodes.length) {
-    return null;
-  }
+  const paragraphs = [...document.querySelectorAll("p, blockquote")]
+    .filter((node) => !node.closest(HARD_NOISE_SELECTOR))
+    .filter((node) => !node.closest(STRONG_NOISE_SELECTOR))
+    .filter((node) => {
+      const text = normalizeText(node.textContent);
+      return (
+        text.length >= 45 &&
+        !looksLikeAdvertisement(text) &&
+        !looksLikeTerminalBoundary(text) &&
+        linkDensity(node, text) <= 0.5
+      );
+    });
 
   const parentStats = new Map();
 
-  for (const node of paragraphNodes) {
+  for (const node of paragraphs) {
     const text = normalizeText(node.textContent);
     let parent = node.parentElement;
 
-    for (let depth = 0; parent && depth < 6; depth += 1) {
-      if (
-        parent.matches?.(HARD_NOISE_SELECTOR) ||
-        parent.matches?.(STRONG_NOISE_SELECTOR)
-      ) {
-        break;
-      }
-
-      const current = parentStats.get(parent) || {
-        chars: 0,
-        paragraphs: 0
-      };
-
+    for (let depth = 0; parent && depth < 7; depth += 1) {
+      const current = parentStats.get(parent) || { chars: 0, paragraphs: 0 };
       current.chars += text.length;
       current.paragraphs += 1;
       parentStats.set(parent, current);
@@ -482,51 +419,36 @@ function densityClusterExtraction() {
   const ranked = [...parentStats.entries()]
     .map(([element, stats]) => {
       const segment = bestContiguousSegment(element);
-
       if (!segment) {
         return null;
       }
-
-      const headingBonus = element.querySelector?.("h1") ? 900 : 0;
-      const paragraphBonus = Math.min(stats.paragraphs, 24) * 120;
-
       return {
-        element,
+        title: normalizeText(element.querySelector?.("h1")?.textContent || titleFromDocument()),
         text: segment.text,
+        method: "density-cluster",
         score:
           segment.score +
           stats.chars * 0.35 +
-          paragraphBonus +
-          headingBonus
+          Math.min(stats.paragraphs, 24) * 120 +
+          (element.querySelector?.("h1") ? 900 : 0)
       };
     })
     .filter(Boolean)
     .filter(({ text }) => text.length >= MIN_ARTICLE_CHARS)
     .sort((a, b) => b.score - a.score);
 
-  const selected = ranked[0];
-
-  if (!selected) {
-    return null;
-  }
-
-  return {
-    title: articleTitle(selected.element),
-    text: selected.text,
-    method: "density-cluster"
-  };
+  return ranked[0] || null;
 }
 
 function extractReadableText() {
   const selected =
+    structuredDataExtraction() ||
     readabilityExtraction() ||
-    heuristicExtraction() ||
+    semanticExtraction() ||
     densityClusterExtraction();
 
   if (!selected || selected.text.length < MIN_ARTICLE_CHARS) {
-    throw new Error(
-      "متن اصلی مقاله در این صفحه با اطمینان کافی پیدا نشد."
-    );
+    throw new Error("متن اصلی مقاله در این صفحه با اطمینان کافی پیدا نشد.");
   }
 
   const truncated = selected.text.length > MAX_EXTRACTED_CHARS;
@@ -545,28 +467,23 @@ function extractReadableText() {
 if (!globalThis.__AVAYAR_EXTRACTOR_INSTALLED__) {
   globalThis.__AVAYAR_EXTRACTOR_INSTALLED__ = true;
 
-  chrome.runtime.onMessage.addListener(
-    (message, _sender, sendResponse) => {
-      if (message?.type !== "AVAYAR_EXTRACT") {
-        return false;
-      }
-
-      try {
-        sendResponse({
-          ok: true,
-          result: extractReadableText()
-        });
-      } catch (error) {
-        sendResponse({
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error)
-        });
-      }
-
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "AVAYAR_EXTRACT") {
       return false;
     }
-  );
+
+    try {
+      sendResponse({
+        ok: true,
+        result: extractReadableText()
+      });
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    return false;
+  });
 }
