@@ -107,6 +107,34 @@ article h2 {
   max-height: 38vh;
   overflow: auto;
   color: #cfdbeb;
-  line-height: 1.9;
-  white-space: pre-wrap;
+  line-height: 1.95;
+  white-space: normal;
+}
+
+#output .avayar-heading {
+  margin: 18px 0 8px;
+  color: #f5f7fb;
+  font-size: 15px;
+  line-height: 1.75;
+  font-weight: 800;
+}
+
+#output .avayar-heading:first-child {
+  margin-top: 0;
+}
+
+#output .avayar-paragraph,
+#output .avayar-list-item,
+#output .avayar-quote {
+  margin: 0 0 12px;
+}
+
+#output .avayar-list-item {
+  padding-inline-start: 8px;
+}
+
+#output .avayar-quote {
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid #35506b;
+  color: #b8cae0;
 }
