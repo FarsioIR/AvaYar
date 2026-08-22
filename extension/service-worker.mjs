@@ -38,28 +38,37 @@ function pageContext(tab) {
 }
 
 chrome.action.onClicked.addListener(
-  async (tab) => {
+  (tab) => {
+    if (!tab?.id) {
+      return;
+    }
+
+    const openPanel =
+      chrome.sidePanel.open({
+        tabId: tab.id
+      });
+
     const context =
       pageContext(tab);
 
-    if (context) {
-      await chrome.storage
-        .session.set({
+    const persistContext = context
+      ? chrome.storage.session.set({
           [ACTIVE_PAGE_CONTEXT]:
             context
-        });
-    } else {
-      await chrome.storage
-        .session.remove(
+        })
+      : chrome.storage.session.remove(
           ACTIVE_PAGE_CONTEXT
         );
-    }
 
-    if (tab?.id) {
-      await chrome.sidePanel.open({
-        tabId: tab.id
-      });
-    }
+    void Promise.all([
+      openPanel,
+      persistContext
+    ]).catch((error) => {
+      console.error(
+        "AvaYar action handling failed.",
+        error
+      );
+    });
   }
 );
 
