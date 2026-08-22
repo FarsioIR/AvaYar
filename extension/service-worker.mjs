@@ -1,13 +1,65 @@
 const DEFAULT_API_BASE =
   "http://127.0.0.1:4173";
 
-chrome.runtime.onInstalled.addListener(
-  async () => {
-    await chrome.sidePanel
-      .setPanelBehavior({
-        openPanelOnActionClick:
-          true
+const ACTIVE_PAGE_CONTEXT =
+  "activePageContext";
+
+void chrome.sidePanel
+  .setPanelBehavior({
+    openPanelOnActionClick:
+      false
+  });
+
+function pageContext(tab) {
+  if (!tab?.id || !tab.url) {
+    return null;
+  }
+
+  try {
+    const url = new URL(tab.url);
+
+    if (
+      ![
+        "http:",
+        "https:"
+      ].includes(url.protocol)
+    ) {
+      return null;
+    }
+
+    return {
+      tabId: tab.id,
+      url: tab.url,
+      origin: url.origin
+    };
+  } catch {
+    return null;
+  }
+}
+
+chrome.action.onClicked.addListener(
+  async (tab) => {
+    const context =
+      pageContext(tab);
+
+    if (context) {
+      await chrome.storage
+        .session.set({
+          [ACTIVE_PAGE_CONTEXT]:
+            context
+        });
+    } else {
+      await chrome.storage
+        .session.remove(
+          ACTIVE_PAGE_CONTEXT
+        );
+    }
+
+    if (tab?.id) {
+      await chrome.sidePanel.open({
+        tabId: tab.id
       });
+    }
   }
 );
 
