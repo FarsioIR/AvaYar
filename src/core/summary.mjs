@@ -94,20 +94,24 @@ function resolveTargetWords(sourceWords, ratioOrOptions) {
     Number.isFinite(ratioOrOptions.targetWords)
   ) {
     return Math.max(
-      60,
+      18,
       Math.min(500, Math.round(ratioOrOptions.targetWords))
     );
   }
 
   if (typeof ratioOrOptions === "number" && Number.isFinite(ratioOrOptions)) {
     return Math.max(
-      60,
+      18,
       Math.min(500, Math.round(sourceWords * ratioOrOptions))
     );
   }
 
+  if (sourceWords <= 80) {
+    return Math.max(18, Math.round(sourceWords * 0.55));
+  }
+
   if (sourceWords <= 180) {
-    return sourceWords;
+    return Math.max(35, Math.round(sourceWords * 0.5));
   }
 
   if (sourceWords <= 450) {
@@ -138,7 +142,7 @@ export function summarizePersian(text, ratioOrOptions) {
   const sentences = splitSentences(source);
   const sourceWords = wordCount(source);
 
-  if (!source || sentences.length <= 2 || sourceWords <= 180) {
+  if (!source || sentences.length <= 2) {
     return source;
   }
 
@@ -229,7 +233,7 @@ export function summarizePersian(text, ratioOrOptions) {
     const nextTotal = selectedWords + candidate.wordCount;
 
     if (
-      selected.length >= 3 &&
+      selected.length >= 2 &&
       nextTotal > targetWords * 1.12
     ) {
       continue;
@@ -251,9 +255,11 @@ export function summarizePersian(text, ratioOrOptions) {
 
   if (
     firstSentence &&
-    !selected.some((item) => item.index === firstSentence.index)
+    !selected.some((item) => item.index === firstSentence.index) &&
+    selectedWords + firstSentence.wordCount <= targetWords * 1.35
   ) {
     selected.push(firstSentence);
+    selectedWords += firstSentence.wordCount;
   }
 
   const conclusionCandidate = [...scored]
@@ -262,14 +268,24 @@ export function summarizePersian(text, ratioOrOptions) {
 
   if (
     conclusionCandidate &&
-    !selected.some((item) => item.index === conclusionCandidate.index)
+    !selected.some((item) => item.index === conclusionCandidate.index) &&
+    selectedWords + conclusionCandidate.wordCount <= targetWords * 1.35
   ) {
     selected.push(conclusionCandidate);
   }
 
-  return selected
+  const summary = selected
     .sort((a, b) => a.index - b.index)
     .map((item) => item.sentence)
     .join(" ")
     .trim();
+
+  if (summary.length >= source.length && sentences.length > 2) {
+    return sentences
+      .slice(0, Math.max(1, sentences.length - 1))
+      .join(" ")
+      .trim();
+  }
+
+  return summary;
 }
