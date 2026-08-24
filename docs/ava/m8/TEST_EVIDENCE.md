@@ -33,4 +33,18 @@ Behavioral changes:
 - intro/conclusion retention is now subject to the target budget instead of being appended unconditionally;
 - final defensive invariant prevents Summary mode from returning text equal to or longer than a source with more than two sentences.
 
-Next gate: pull the branch, rerun `npm test`, then rerun extension build/package checks before manual article validation.
+### Current validation gate
+
+The local working tree was clean when the failure was reported, so the failure is fully reproducible from the committed branch state rather than an uncommitted local edit. The corrective commits are now on `feat/25-m8-summary-voice` and must be pulled locally before the next run.
+
+Next commands:
+
+```powershell
+git pull --ff-only
+npm test
+npm run build:extension
+npm run check:extension
+git status
+```
+
+Expected result: all tests pass, extension build/package checks pass, and working tree remains clean. Only after this gate passes should manual Persian article summary validation resume.
