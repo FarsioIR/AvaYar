@@ -33,18 +33,38 @@ Behavioral changes:
 - intro/conclusion retention is now subject to the target budget instead of being appended unconditionally;
 - final defensive invariant prevents Summary mode from returning text equal to or longer than a source with more than two sentences.
 
-### Current validation gate
+### Automated validation — PASS
 
-The local working tree was clean when the failure was reported, so the failure is fully reproducible from the committed branch state rather than an uncommitted local edit. The corrective commits are now on `feat/25-m8-summary-voice` and must be pulled locally before the next run.
+After syncing the corrective commits, the local validation gate passed:
 
-Next commands:
+- `npm test`: **34 passed / 0 failed**
+- `npm run build:extension`: PASS
+- `npm run check:extension`: PASS
+- working tree: clean
+
+GitHub Actions Ava CI run #51 also passed lint, unit tests, build, smoke test, and Manifest V3 package validation.
+
+### Manual Persian article validation — PASS
+
+The Digiato Galaxy A27 review was tested in Summary mode. The resulting summary was materially shorter than the source, excluded extraction/ad/benchmark noise, and retained the article introduction, important product observations, competitive trade-offs, and final buying recommendation.
+
+Quality follow-up: the current extractive ranker is somewhat camera-heavy. This is a future ranking-quality refinement and does not reopen the frozen extraction pipeline.
+
+## Phase B — Voice Experience
+
+### Manual browser gate — BLOCKED pending local server startup
+
+On 2026-08-24, pressing Play in the unpacked Chrome extension produced the expected actionable Private Beta error:
+
+`سرور محلی آوایار در دسترس نیست. برای Private Beta ابتدا در پوشه پروژه «npm run dev» را اجرا کنید و سپس دوباره تلاش کنید.`
+
+This is not a TTS regression. The M6 Private Beta architecture intentionally requires the local AvaYar backend to be running. `npm run dev` launches the Windows startup wrapper, which starts `scripts/dev-server.mjs` on `127.0.0.1:4173`. The `/api/tts` route additionally requires a server-side `GEMINI_API_KEY`; the extension must not contain the provider credential.
+
+Next manual gate:
 
 ```powershell
-git pull --ff-only
-npm test
-npm run build:extension
-npm run check:extension
-git status
+cd C:\Projects\AvaYar
+npm run dev
 ```
 
-Expected result: all tests pass, extension build/package checks pass, and working tree remains clean. Only after this gate passes should manual Persian article summary validation resume.
+Keep that terminal running, verify `http://127.0.0.1:4173/healthz`, then retry Summary playback with the female and male voices. If speech is not configured, diagnose the server-side `GEMINI_API_KEY` configuration rather than placing any credential in the extension.
