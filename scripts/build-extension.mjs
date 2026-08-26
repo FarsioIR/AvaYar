@@ -47,6 +47,13 @@ await mkdir(
   }
 );
 
+for (const size of [16, 32, 48, 128]) {
+  await cp(
+    resolve(root, `assets/brand/avayar-mark-${size}.png`),
+    resolve(target, `assets/avayar-mark-${size}.png`)
+  );
+}
+
 await cp(
   resolve(root, "assets/brand/avayar-mark.png"),
   resolve(target, "assets/avayar-mark.png")
