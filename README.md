@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./assets/brand/avayar-mark.png" alt="AvaYar · آوایار" width="180" />
+<img src="./assets/brand/avayar-flat.svg" alt="AvaYar · آوایار" width="180" />
 
 # AvaYar · آوایار
 
@@ -10,7 +10,7 @@ Persian-first web reading, translation, summarization and text-to-speech workflo
 
 **بشنو، به فارسی**
 
-[Product page](https://farsio.ir/fa/products/ava) ·
+[Product page](https://farsio.ir/fa/products/avayar) ·
 [Farsio](https://farsio.ir) ·
 [M2 architecture](./docs/ava/m2/ARCHITECTURE.md) ·
 [M2 status](./docs/ava/m2/MVP_STATUS.md)
@@ -145,7 +145,8 @@ The next implementation work should focus on evidence-backed product capabilitie
 - **Product:** AvaYar · آوایار
 - **Product line:** Persian Reading & Listening Assistant by Farsio
 - **Tagline:** بشنو، به فارسی
-- **Product page:** https://farsio.ir/fa/products/ava
+- **Canonical brand mark:** [`assets/brand/avayar-flat.svg`](./assets/brand/avayar-flat.svg)
+- **Product page:** https://farsio.ir/fa/products/avayar
 - **Repository:** https://github.com/FarsioIR/AvaYar
 
 ---

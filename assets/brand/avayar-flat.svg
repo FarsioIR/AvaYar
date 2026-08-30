@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="avayarGradient" x1="104" y1="394" x2="404" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F80FF"/>
+      <stop offset="0.48" stop-color="#4E6CFF"/>
+      <stop offset="1" stop-color="#8A3FFC"/>
+    </linearGradient>
+  </defs>
+  <path d="M118 382L245 145C250 136 262 136 267 145L394 382" stroke="url(#avayarGradient)" stroke-width="86" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
