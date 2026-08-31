@@ -127,7 +127,7 @@ function splitForTranslation(text, maxChars = 1200) {
 async function loadSharedPipeline(config) {
   const cacheDir = resolveCacheDir(config);
   const key =
-    `${config.model}|${config.dtype}|${cacheDir}`;
+    `${config.localModel ?? config.model}|${config.dtype}|${cacheDir}`;
 
   if (!sharedPipeline || sharedPipelineKey !== key) {
     transformersEnv.cacheDir = cacheDir;
@@ -136,7 +136,7 @@ async function loadSharedPipeline(config) {
     sharedPipelineKey = key;
     sharedPipeline = await pipeline(
       "translation",
-      config.model,
+      config.localModel ?? config.model,
       {
         dtype: config.dtype
       }

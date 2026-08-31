@@ -9,6 +9,9 @@ import {
   GeminiPersianSpeechSynthesizer
 } from "./providers/gemini-speech.mjs";
 import {
+  GeminiPersianTranslator
+} from "./providers/gemini-translation.mjs";
+import {
   WebpageExtractor
 } from "./extraction/webpage-extractor.mjs";
 
@@ -86,11 +89,22 @@ export function createApiHandler({
         const body = await readJson(request);
         const config = getProviderConfig(env);
 
-        const translator = new LocalM2M100Translator({
-          config: config.translation,
-          pipelineFactory: translationPipelineFactory,
-          languageDetector: translationLanguageDetector
-        });
+        const translator =
+          config.translation.provider === "gemini"
+            ? new GeminiPersianTranslator({
+                apiKey:
+                  config.translation.apiKey,
+                model:
+                  config.translation.model
+              })
+            : new LocalM2M100Translator({
+                config:
+                  config.translation,
+                pipelineFactory:
+                  translationPipelineFactory,
+                languageDetector:
+                  translationLanguageDetector
+              });
 
         const text = await translator.translateToPersian(
           body.text,
@@ -105,7 +119,8 @@ export function createApiHandler({
         json(response, 200, {
           text,
           to: "fa",
-          provider: "local-m2m100"
+          provider:
+            config.translation.provider
         });
         return true;
       }

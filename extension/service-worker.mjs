@@ -1,5 +1,7 @@
 const DEFAULT_API_BASE =
   "http://127.0.0.1:4173";
+const PRODUCTION_API_BASE =
+  "__AVAYAR_PRODUCTION_API_BASE__";
 
 const ACTIVE_PAGE_CONTEXT =
   "activePageContext";
@@ -119,7 +121,14 @@ async function apiRequest({
 
   const apiBase =
     normalizedApiBase(
-      stored.apiBase
+      stored.apiBase ||
+      (
+        PRODUCTION_API_BASE !==
+          "__AVAYAR_PRODUCTION_API_BASE__"
+          ? PRODUCTION_API_BASE
+          : null
+      ) ||
+      DEFAULT_API_BASE
     );
 
   let response;

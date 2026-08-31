@@ -19,7 +19,8 @@
     "live:translation": "node scripts/live-translation-probe.mjs",
     "live:speech": "node scripts/live-gemini-speech-probe.mjs",
     "live:extract": "node scripts/live-extraction-probe.mjs",
-    "dev:windows": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/start-avayar-windows.ps1"
+    "dev:windows": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/start-avayar-windows.ps1",
+    "start": "node scripts/production-server.mjs"
   },
   "dependencies": {
     "@google/genai": "2.16.0",
