@@ -1,15 +1,18 @@
-const DEFAULT_API_BASE =
+const DEFAULT_DEVELOPMENT_API_BASE =
   "http://127.0.0.1:4173";
+
 const PRODUCTION_API_BASE =
   "__AVAYAR_PRODUCTION_API_BASE__";
+
+const EXTENSION_MODE =
+  "__AVAYAR_EXTENSION_MODE__";
 
 const ACTIVE_PAGE_CONTEXT =
   "activePageContext";
 
 void chrome.sidePanel
   .setPanelBehavior({
-    openPanelOnActionClick:
-      false
+    openPanelOnActionClick: false
   });
 
 function pageContext(tab) {
@@ -53,14 +56,15 @@ chrome.action.onClicked.addListener(
     const context =
       pageContext(tab);
 
-    const persistContext = context
-      ? chrome.storage.session.set({
-          [ACTIVE_PAGE_CONTEXT]:
-            context
-        })
-      : chrome.storage.session.remove(
-          ACTIVE_PAGE_CONTEXT
-        );
+    const persistContext =
+      context
+        ? chrome.storage.session.set({
+            [ACTIVE_PAGE_CONTEXT]:
+              context
+          })
+        : chrome.storage.session.remove(
+            ACTIVE_PAGE_CONTEXT
+          );
 
     void Promise.all([
       openPanel,
@@ -74,39 +78,105 @@ chrome.action.onClicked.addListener(
   }
 );
 
-function normalizedApiBase(value) {
-  const url = new URL(
-    value || DEFAULT_API_BASE
-  );
+function normalizeHttpsApiBase(value) {
+  const url = new URL(value);
 
-  if (
-    url.protocol !== "https:" &&
-    !(
-      url.protocol === "http:" &&
-      [
-        "127.0.0.1",
-        "localhost"
-      ].includes(url.hostname)
-    )
-  ) {
+  if (url.protocol !== "https:") {
     throw new Error(
-      "سرور آوایار باید HTTPS یا localhost باشد."
+      "ارتباط نسخه نهایی آوایار باید امن باشد."
     );
   }
 
   return url.origin;
 }
 
+function normalizeDevelopmentApiBase(value) {
+  const url = new URL(
+    value ||
+    DEFAULT_DEVELOPMENT_API_BASE
+  );
+
+  if (
+    url.protocol === "https:"
+  ) {
+    return url.origin;
+  }
+
+  if (
+    url.protocol === "http:" &&
+    [
+      "127.0.0.1",
+      "localhost"
+    ].includes(url.hostname)
+  ) {
+    return url.origin;
+  }
+
+  throw new Error(
+    "Development API must use HTTPS or localhost."
+  );
+}
+
+async function resolveApiBase() {
+  if (EXTENSION_MODE === "production") {
+    if (
+      !PRODUCTION_API_BASE ||
+      PRODUCTION_API_BASE ===
+        "__AVAYAR_PRODUCTION_API_BASE__"
+    ) {
+      throw new Error(
+        "نسخه نهایی آوایار به سرویس آنلاین متصل نشده است."
+      );
+    }
+
+    return normalizeHttpsApiBase(
+      PRODUCTION_API_BASE
+    );
+  }
+
+  const stored =
+    await chrome.storage.local.get(
+      "developerApiBase"
+    );
+
+  return normalizeDevelopmentApiBase(
+    stored.developerApiBase
+  );
+}
+
 function networkErrorMessage(apiBase) {
-  const url = new URL(apiBase);
-  const isLocal = [
-    "127.0.0.1",
-    "localhost"
-  ].includes(url.hostname);
+  const url =
+    new URL(apiBase);
+
+  const isLocal =
+    [
+      "127.0.0.1",
+      "localhost"
+    ].includes(url.hostname);
 
   return isLocal
-    ? "سرور محلی آوایار در دسترس نیست. برای Private Beta ابتدا در پوشه پروژه «npm run dev» را اجرا کنید و سپس دوباره تلاش کنید."
-    : "ارتباط با سرور آوایار برقرار نشد. اتصال شبکه و آدرس سرور را بررسی کنید.";
+    ? "سرویس توسعه آوایار در دسترس نیست."
+    : "ارتباط با سرویس آنلاین آوایار برقرار نشد. دوباره تلاش کنید.";
+}
+
+function apiErrorMessage(
+  response,
+  error
+) {
+  if (response.status === 429) {
+    return "ظرفیت سرویس آوایار موقتاً تکمیل است. کمی بعد دوباره تلاش کنید.";
+  }
+
+  if (
+    response.status >= 500
+  ) {
+    return "سرویس آوایار موقتاً در دسترس نیست. دوباره تلاش کنید.";
+  }
+
+  return (
+    error?.error ||
+    `AvaYar API failed (${response.status}).`
+  );
 }
 
 async function apiRequest({
@@ -114,51 +184,43 @@ async function apiRequest({
   body,
   responseType = "json"
 }) {
-  const stored =
-    await chrome.storage.local.get(
-      "apiBase"
-    );
-
   const apiBase =
-    normalizedApiBase(
-      stored.apiBase ||
-      (
-        PRODUCTION_API_BASE !==
-          "__AVAYAR_PRODUCTION_API_BASE__"
-          ? PRODUCTION_API_BASE
-          : null
-      ) ||
-      DEFAULT_API_BASE
-    );
+    await resolveApiBase();
 
   let response;
 
   try {
-    response = await fetch(
-      `${apiBase}${path}`,
-      {
-        method:
-          body ? "POST" : "GET",
-        headers:
-          body
-            ? {
-                "content-type":
-                  "application/json"
-              }
-            : undefined,
-        body:
-          body
-            ? JSON.stringify(body)
-            : undefined
-      }
-    );
+    response =
+      await fetch(
+        `${apiBase}${path}`,
+        {
+          method:
+            body ? "POST" : "GET",
+
+          headers:
+            body
+              ? {
+                  "content-type":
+                    "application/json"
+                }
+              : undefined,
+
+          body:
+            body
+              ? JSON.stringify(body)
+              : undefined
+        }
+      );
   } catch (error) {
     if (
       error instanceof TypeError ||
-      error?.message === "Failed to fetch"
+      error?.message ===
+        "Failed to fetch"
     ) {
       throw new Error(
-        networkErrorMessage(apiBase)
+        networkErrorMessage(
+          apiBase
+        )
       );
     }
 
@@ -174,12 +236,16 @@ async function apiRequest({
         );
 
     throw new Error(
-      error.error ||
-      `AvaYar API failed (${response.status}).`
+      apiErrorMessage(
+        response,
+        error
+      )
     );
   }
 
-  if (responseType === "audio") {
+  if (
+    responseType === "audio"
+  ) {
     const bytes =
       await response
         .arrayBuffer();
@@ -189,14 +255,18 @@ async function apiRequest({
         Array.from(
           new Uint8Array(bytes)
         ),
+
       contentType:
         response.headers.get(
           "content-type"
-        ) || "audio/wav",
+        ) ||
+        "audio/wav",
+
       voiceName:
         response.headers.get(
           "x-avayar-voice-name"
         ),
+
       voiceGender:
         response.headers.get(
           "x-avayar-voice-gender"
@@ -232,6 +302,7 @@ chrome.runtime.onMessage.addListener(
         (error) =>
           sendResponse({
             ok: false,
+
             error:
               error instanceof Error
                 ? error.message

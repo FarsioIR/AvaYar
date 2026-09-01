@@ -3,20 +3,38 @@ import {
   readFile,
   readdir
 } from "node:fs/promises";
-import { resolve } from "node:path";
 
-await import("./build-extension.mjs");
+import {
+  resolve
+} from "node:path";
 
-const root = process.cwd();
-const target = resolve(root, "dist-extension");
-const manifest = JSON.parse(
-  await readFile(
-    resolve(target, "manifest.json"),
-    "utf8"
-  )
+await import(
+  "./build-extension.mjs"
 );
 
-if (manifest.manifest_version !== 3) {
+const root =
+  process.cwd();
+
+const target =
+  resolve(
+    root,
+    "dist-extension"
+  );
+
+const manifest =
+  JSON.parse(
+    await readFile(
+      resolve(
+        target,
+        "manifest.json"
+      ),
+      "utf8"
+    )
+  );
+
+if (
+  manifest.manifest_version !== 3
+) {
   throw new Error(
     "AvaYar extension must use Manifest V3."
   );
@@ -30,8 +48,15 @@ const requiredPermissions =
     "storage"
   ];
 
-for (const permission of requiredPermissions) {
-  if (!manifest.permissions.includes(permission)) {
+for (
+  const permission
+  of requiredPermissions
+) {
+  if (
+    !manifest.permissions.includes(
+      permission
+    )
+  ) {
     throw new Error(
       `Missing extension permission: ${permission}`
     );
@@ -39,18 +64,25 @@ for (const permission of requiredPermissions) {
 }
 
 if (
-  manifest.permissions.includes("tabs") ||
-  Array.isArray(manifest.content_scripts)
+  manifest.permissions.includes(
+    "tabs"
+  ) ||
+  Array.isArray(
+    manifest.content_scripts
+  )
 ) {
   throw new Error(
-    "AvaYar must not request persistent tab access or inject persistent content scripts."
+    "AvaYar must not request persistent tab access or persistent content scripts."
   );
 }
 
-for (const origin of [
-  "http://*/*",
-  "https://*/*"
-]) {
+for (
+  const origin
+  of [
+    "http://*/*",
+    "https://*/*"
+  ]
+) {
   if (
     !manifest
       .optional_host_permissions
@@ -68,13 +100,13 @@ async function artifactText(
   const chunks = [];
 
   for (
-    const entry of
-      await readdir(
-        directory,
-        {
-          withFileTypes: true
-        }
-      )
+    const entry
+    of await readdir(
+      directory,
+      {
+        withFileTypes: true
+      }
+    )
   ) {
     const path =
       resolve(
@@ -82,14 +114,17 @@ async function artifactText(
         entry.name
       );
 
-    if (entry.isDirectory()) {
+    if (
+      entry.isDirectory()
+    ) {
       chunks.push(
-        await artifactText(path)
+        await artifactText(
+          path
+        )
       );
     } else if (
-      /\.(?:html|json|mjs|js|css|md)$/u.test(
-        entry.name
-      )
+      /\.(?:html|json|mjs|js|css|md)$/u
+        .test(entry.name)
     ) {
       chunks.push(
         await readFile(
@@ -100,30 +135,80 @@ async function artifactText(
     }
   }
 
-  return chunks.join("\n");
-}
-
-const files =
-  await artifactText(target);
-
-if (/GEMINI_API_KEY|AIza[0-9A-Za-z_-]{20,}/u.test(files)) {
-  throw new Error(
-    "Credential-like content found in extension artifact names."
+  return chunks.join(
+    "\n"
   );
 }
 
-for (const file of [
-  "service-worker.mjs",
-  "content-script.mjs",
-  "readability.js",
-  "sidepanel.html",
-  "sidepanel.mjs",
-  "sidepanel.css",
-  "assets/avayar-mark.png"
-]) {
-  await access(resolve(target, file));
+const files =
+  await artifactText(
+    target
+  );
+
+if (
+  /GEMINI_API_KEY|AIza[0-9A-Za-z_-]{20,}/u
+    .test(files)
+) {
+  throw new Error(
+    "Credential-like content found in extension artifact."
+  );
+}
+
+for (
+  const file
+  of [
+    "service-worker.mjs",
+    "content-script.mjs",
+    "readability.js",
+    "sidepanel.html",
+    "sidepanel.mjs",
+    "sidepanel.css",
+    "assets/avayar-mark.png"
+  ]
+) {
+  await access(
+    resolve(
+      target,
+      file
+    )
+  );
+}
+
+const mode =
+  (
+    process.env
+      .AVAYAR_EXTENSION_MODE ||
+    "development"
+  )
+    .trim()
+    .toLowerCase();
+
+if (
+  mode === "production"
+) {
+  if (
+    /Private Beta|تنظیم سرور|127\.0\.0\.1:4173|localhost:4173/u
+      .test(files)
+  ) {
+    throw new Error(
+      "Production extension contains development-only UI or runtime references."
+    );
+  }
+
+  if (
+    files.includes(
+      "__AVAYAR_PRODUCTION_API_BASE__"
+    ) ||
+    files.includes(
+      "__AVAYAR_EXTENSION_MODE__"
+    )
+  ) {
+    throw new Error(
+      "Production extension contains unresolved build placeholders."
+    );
+  }
 }
 
 console.log(
-  "Manifest V3 extension package check passed."
+  `Manifest V3 ${mode} extension package check passed.`
 );
