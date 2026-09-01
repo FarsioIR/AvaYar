@@ -11,6 +11,18 @@ const root = process.cwd();
 const source = resolve(root, "extension");
 const target = resolve(root, "dist-extension");
 
+const productionApiBase =
+  process.env.AVAYAR_PRODUCTION_API_BASE?.trim();
+
+if (
+  productionApiBase &&
+  !productionApiBase.startsWith("https://")
+) {
+  throw new Error(
+    "AVAYAR_PRODUCTION_API_BASE must use HTTPS."
+  );
+}
+
 await rm(target, {
   recursive: true,
   force: true
@@ -47,6 +59,19 @@ await mkdir(
   }
 );
 
+for (const size of [16, 32, 48, 128]) {
+  await cp(
+    resolve(
+      root,
+      `assets/brand/avayar-mark-${size}.png`
+    ),
+    resolve(
+      target,
+      `assets/avayar-mark-${size}.png`
+    )
+  );
+}
+
 await cp(
   resolve(root, "assets/brand/avayar-mark.png"),
   resolve(target, "assets/avayar-mark.png")
@@ -77,6 +102,45 @@ await writeFile(
   "utf8"
 );
 
+if (productionApiBase) {
+  const serviceWorkerPath =
+    resolve(
+      target,
+      "service-worker.mjs"
+    );
+
+  const serviceWorker =
+    await readFile(
+      serviceWorkerPath,
+      "utf8"
+    );
+
+  if (
+    !serviceWorker.includes(
+      "__AVAYAR_PRODUCTION_API_BASE__"
+    )
+  ) {
+    throw new Error(
+      "AvaYar production API placeholder was not found."
+    );
+  }
+
+  await writeFile(
+    serviceWorkerPath,
+    serviceWorker.replaceAll(
+      "__AVAYAR_PRODUCTION_API_BASE__",
+      productionApiBase
+    ),
+    "utf8"
+  );
+}
+
 console.log(
   `Built AvaYar extension ${manifest.version} into ${target}`
 );
+
+if (productionApiBase) {
+  console.log(
+    `Production API: ${productionApiBase}`
+  );
+}
