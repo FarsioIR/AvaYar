@@ -207,6 +207,31 @@ if (
       "Production extension contains unresolved build placeholders."
     );
   }
+
+  const productionApiBase =
+    process.env
+      .AVAYAR_PRODUCTION_API_BASE
+      ?.trim();
+
+  if (!productionApiBase) {
+    throw new Error(
+      "Production extension check requires AVAYAR_PRODUCTION_API_BASE."
+    );
+  }
+
+  const productionApiPermission =
+    `${new URL(productionApiBase).origin}/*`;
+
+  if (
+    !manifest.host_permissions
+      ?.includes(
+        productionApiPermission
+      )
+  ) {
+    throw new Error(
+      `Missing production API host permission: ${productionApiPermission}`
+    );
+  }
 }
 
 console.log(
