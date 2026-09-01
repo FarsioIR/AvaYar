@@ -24,11 +24,18 @@ export function getProviderConfig(env = process.env) {
 
   return {
     translation: {
-      model: "Xenova/m2m100_418M",
+      provider:
+        clean(env.AVAYAR_TRANSLATION_PROVIDER) ??
+        (geminiApiKey ? "gemini" : "local-m2m100"),
+      model:
+        clean(env.AVAYAR_TRANSLATION_MODEL) ??
+        "gemini-flash-latest",
+      localModel: "Xenova/m2m100_418M",
       dtype: "q8",
       defaultSourceLanguage:
         clean(env.AVAYAR_TRANSLATION_DEFAULT_SOURCE) ?? "en",
-      cacheDir: clean(env.AVAYAR_MODEL_CACHE)
+      cacheDir: clean(env.AVAYAR_MODEL_CACHE),
+      apiKey: geminiApiKey
     },
     speech: {
       provider: "gemini-tts",
@@ -44,16 +51,22 @@ export function getProviderCapabilities(env = process.env) {
   const config = getProviderConfig(env);
 
   return {
-    translationConfigured: true,
+    translationConfigured:
+      config.translation.provider === "local-m2m100" ||
+      Boolean(config.translation.apiKey),
     speechConfigured: Boolean(config.speech.apiKey),
-    translationProvider: "local-m2m100",
+    translationProvider:
+      config.translation.provider,
     speechProvider: "gemini-tts",
     speechRequiresApiKey: true,
     requiresApiKey: true,
     targetLanguage: "fa",
     speechLocale: "fa-IR",
     defaultSourceLanguage: config.translation.defaultSourceLanguage,
-    model: config.translation.model,
+    model:
+      config.translation.provider === "gemini"
+        ? config.translation.model
+        : config.translation.localModel,
     modelDtype: config.translation.dtype,
     speechModel: config.speech.model,
     voices: {

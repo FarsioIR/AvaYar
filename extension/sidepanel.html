@@ -1,93 +1,166 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-    <title>آوایار</title>
-    <link
-      rel="stylesheet"
-      href="sidepanel.css"
-    />
-  </head>
-  <body>
-    <main>
-      <header>
-        <img
-          src="assets/avayar-mark.png"
-          alt=""
-        />
-        <div>
-          <p>Farsio</p>
-          <h1>آوایار</h1>
-        </div>
-      </header>
+<head>
+  <meta charset="UTF-8" />
 
-      <p class="intro">
-        صفحه را کامل یا خلاصه، با صدای فارسی بشنو.
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>آوایار</title>
+
+  <link
+    rel="stylesheet"
+    href="sidepanel.css"
+  />
+</head>
+
+<body>
+  <main class="app">
+
+    <header class="brand">
+      <img
+        src="assets/avayar-mark.png"
+        alt="نشان آوایار"
+      />
+
+      <div>
+        <span class="brand-parent">
+          فارسیو
+        </span>
+
+        <h1>آوایار</h1>
+
+        <p>
+          دستیار هوشمند شنیدن
+        </p>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h2>
+        بخوان، خلاصه کن و بشنو
+      </h2>
+
+      <p>
+        محتوای فارسی یا انگلیسی همین صفحه را
+        به فارسی آماده کن و با صدای دلخواه بشنو.
       </p>
 
       <button
         id="extract"
         class="primary"
         type="button"
-      >خواندن صفحه فعلی</button>
+      >
+        خواندن این صفحه
+      </button>
+    </section>
 
+    <section
+      class="preferences"
+      aria-label="تنظیمات خواندن"
+    >
       <label>
-        حالت
+        <span>
+          حالت خواندن
+        </span>
+
         <select id="mode">
-          <option value="full">متن کامل</option>
-          <option value="summary">خلاصه فارسی</option>
+          <option value="full">
+            متن کامل
+          </option>
+
+          <option value="summary">
+            خلاصه
+          </option>
         </select>
       </label>
 
       <label>
-        صدا
+        <span>
+          صدا
+        </span>
+
         <select id="voice">
-          <option value="female">زن — Sulafat</option>
-          <option value="male">مرد — Iapetus</option>
+          <option value="female">
+            صدای زن
+          </option>
+
+          <option value="male">
+            صدای مرد
+          </option>
         </select>
       </label>
+    </section>
 
-      <details>
-        <summary>تنظیم سرور Private Beta</summary>
-        <label>
-          آدرس API
-          <input
-            id="apiBase"
-            type="url"
-            value="http://127.0.0.1:4173"
-          />
-        </label>
-        <button
-          id="saveSettings"
-          type="button"
-        >ذخیره</button>
-      </details>
+    <p
+      id="status"
+      class="status"
+      role="status"
+      aria-live="polite"
+    >
+      آماده‌ام. یک صفحه وب را باز کن و «خواندن این صفحه» را بزن.
+    </p>
 
-      <p
-        id="status"
-        role="status"
-      >برای شروع، دکمه خواندن صفحه را بزنید.</p>
+    <section
+      class="reader"
+      aria-live="polite"
+    >
+      <div class="reader-header">
+        <span id="modeBadge">
+          متن کامل
+        </span>
 
-      <article>
-        <h2 id="title">هنوز صفحه‌ای انتخاب نشده</h2>
-        <div id="output"></div>
-      </article>
-
-      <div class="controls">
-        <button id="play" disabled>پخش</button>
-        <button id="pause" disabled>مکث</button>
-        <button id="stop" disabled>توقف</button>
+        <h2 id="title">
+          هنوز صفحه‌ای انتخاب نشده
+        </h2>
       </div>
 
+      <div id="output">
+        <p class="empty">
+          متن آماده‌شده اینجا نمایش داده می‌شود.
+        </p>
+      </div>
+    </section>
+
+    <section
+      class="player"
+      aria-label="کنترل پخش"
+    >
+      <button
+        id="play"
+        class="primary"
+        type="button"
+        disabled
+      >
+        پخش
+      </button>
+
+      <button
+        id="pause"
+        type="button"
+        disabled
+      >
+        مکث
+      </button>
+
+      <button
+        id="stop"
+        type="button"
+        disabled
+      >
+        توقف
+      </button>
+
       <audio id="audio"></audio>
-    </main>
-    <script
-      type="module"
-      src="sidepanel.mjs"
-    ></script>
-  </body>
+    </section>
+
+  </main>
+
+  <script
+    type="module"
+    src="sidepanel.mjs"
+  ></script>
+</body>
 </html>

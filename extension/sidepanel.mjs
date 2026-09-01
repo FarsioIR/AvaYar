@@ -6,13 +6,7 @@ import {
   cleanArticleText
 } from "./core/content-cleaner.mjs";
 
-
-const ACTIVE_PAGE_CONTEXT =
-  "activePageContext";
-
-
 const elements = {
-
   extract:
     document.querySelector("#extract"),
 
@@ -22,17 +16,14 @@ const elements = {
   voice:
     document.querySelector("#voice"),
 
-  apiBase:
-    document.querySelector("#apiBase"),
-
-  saveSettings:
-    document.querySelector("#saveSettings"),
-
   status:
     document.querySelector("#status"),
 
   title:
     document.querySelector("#title"),
+
+  modeBadge:
+    document.querySelector("#modeBadge"),
 
   output:
     document.querySelector("#output"),
@@ -48,20 +39,17 @@ const elements = {
 
   audio:
     document.querySelector("#audio")
-
 };
 
-
+let sourcePersianText = "";
 let preparedText = "";
-
 let audioUrl = null;
-
+let busy = false;
 
 function setStatus(
   message,
   isError = false
 ) {
-
   elements.status.textContent =
     message;
 
@@ -69,1006 +57,614 @@ function setStatus(
     "error",
     isError
   );
-
 }
 
+function setBusy(
+  value,
+  message
+) {
+  busy = value;
+
+  elements.extract.disabled =
+    value;
+
+  elements.mode.disabled =
+    value;
+
+  elements.voice.disabled =
+    value;
+
+  if (message) {
+    setStatus(message);
+  }
+}
+
+function revokeAudio() {
+  if (audioUrl) {
+    URL.revokeObjectURL(
+      audioUrl
+    );
+
+    audioUrl = null;
+  }
+
+  elements.audio.removeAttribute(
+    "src"
+  );
+
+  elements.audio.load();
+
+  elements.pause.disabled = true;
+  elements.stop.disabled = true;
+}
+
+function resetAudio() {
+  if (!elements.audio.paused) {
+    elements.audio.pause();
+  }
+
+  revokeAudio();
+
+  elements.play.disabled =
+    !preparedText;
+
+  elements.play.textContent =
+    "پخش";
+}
 
 async function api(message) {
-
   const response =
     await chrome.runtime.sendMessage({
-
       target:
         "avayar-api",
 
       ...message
-
     });
-
 
   if (!response?.ok) {
-
     throw new Error(
-
       response?.error ||
-
-      "ارتباط با سرور آوایار ناموفق بود."
-
+      "ارتباط با آوایار برقرار نشد."
     );
-
   }
 
-
   return response.result;
-
 }
 
-
 async function currentTab() {
-
   const tabs =
     await chrome.tabs.query({
-
-      active:
-        true,
-
-      currentWindow:
-        true
-
+      active: true,
+      currentWindow: true
     });
-
 
   const tab =
     tabs[0];
 
-
   if (!tab?.id) {
-
     throw new Error(
-      "تب فعال پیدا نشد."
+      "صفحه فعال پیدا نشد."
     );
-
   }
 
-
   return tab;
-
 }
 
-
 async function ensurePageAccess(tab) {
-
   if (!tab.url) {
-
     throw new Error(
       "آدرس صفحه در دسترس نیست."
     );
-
   }
-
 
   const url =
     new URL(tab.url);
 
-
   if (
-    !["http:", "https:"]
-      .includes(url.protocol)
+    ![
+      "http:",
+      "https:"
+    ].includes(url.protocol)
   ) {
-
     throw new Error(
-      "آوایار فقط روی صفحات وب اجرا می‌شود."
+      "آوایار فقط روی صفحات وب قابل استفاده است."
     );
-
   }
-
 
   const originPattern =
     `${url.origin}/*`;
 
-
   const hasAccess =
     await chrome.permissions.contains({
-
-      origins:
-        [
-          originPattern
-        ]
-
+      origins: [
+        originPattern
+      ]
     });
 
-
   if (hasAccess) {
-
     return;
-
   }
-
 
   const granted =
     await chrome.permissions.request({
-
-      origins:
-        [
-          originPattern
-        ]
-
+      origins: [
+        originPattern
+      ]
     });
 
-
   if (!granted) {
-
     throw new Error(
-      "دسترسی صفحه داده نشد."
+      "برای خواندن این صفحه باید دسترسی آن را به آوایار بدهی."
     );
-
   }
-
 }
 
-
-function cleanText(text) {
-
-  return String(text || "")
-
-    .replace(
-      /\b(share|like|follow|subscribe|click|read more)\b/gi,
-      ""
-    )
-
-    .replace(
-      /\s+/g,
-      " "
-    )
-
-    .trim();
-
-}
-
-
-function normalizeBlocks(result) {
-
-  if (
-    Array.isArray(result?.blocks)
-    &&
-    result.blocks.length
-  ) {
-
-    return result.blocks
-
-      .map(block => ({
-
-        type:
-          block.type ||
-          "paragraph",
-
-        level:
-          block.level,
-
-        text:
-          cleanText(block.text)
-
-      }))
-
-      .filter(
-        block =>
-          block.text
-      );
-
-  }
-
-
-  return String(
-    result?.text || ""
-  )
-
-    .split(/\n{2,}/u)
-
-    .map(
-      text =>
-        ({
-
-          type:
-            "paragraph",
-
-          text:
-            cleanText(text)
-
-        })
-    )
-
-    .filter(
-      block =>
-        block.text
-    );
-
-}
-
-
-function blocksToPlainText(blocks) {
-
-  return blocks
-
-    .map(
-      block =>
-        block.text
-    )
-
-    .join("\n\n")
-
-    .trim();
-
-}
-
-
-function sentenceEnded(text) {
-
-  return /[.!?؟؛:]$/u
-    .test(
-      text.trim()
-    );
-
-}
-
-
-function blocksToSpeechText(blocks) {
-
-  return blocks
-
-    .map(
-      block => {
-
-        const text =
-          block.text.trim();
-
-
-        if (
-          block.type === "heading"
-        ) {
-
-          return sentenceEnded(text)
-
-            ? `${text}\n\n`
-
-            : `${text}.\n\n`;
-
-        }
-
-
-        if (
-          block.type === "list-item"
-        ) {
-
-          return sentenceEnded(text)
-
-            ? `${text}\n`
-
-            : `${text}.\n`;
-
-        }
-
-
-        return `${text}\n\n`;
-
-      }
-    )
-
-    .join("")
-
-    .trim();
-
-}
-function renderBlocks(blocks) {
-
+function renderParagraphs(text) {
   const fragment =
     document.createDocumentFragment();
 
+  const paragraphs =
+    String(text || "")
+      .split(/\n{2,}/u)
+      .map(
+        (value) =>
+          value.trim()
+      )
+      .filter(Boolean);
 
-  for (const block of blocks) {
-
-    let element;
-
-
-    if (
-      block.type === "heading"
-    ) {
-
-      element =
-        document.createElement(
-
-          block.level === 1
-            ? "h2"
-            : "h3"
-
-        );
-
-      element.className =
-        "avayar-heading";
-
-    }
-
-    else if (
-      block.type === "quote"
-    ) {
-
-      element =
-        document.createElement(
-          "blockquote"
-        );
-
-      element.className =
-        "avayar-quote";
-
-    }
-
-    else if (
-      block.type === "list-item"
-    ) {
-
-      element =
-        document.createElement(
-          "p"
-        );
-
-      element.className =
-        "avayar-list-item";
-
-      element.textContent =
-        `• ${block.text}`;
-
-      fragment.append(
-        element
+  for (
+    const value
+    of paragraphs
+  ) {
+    const paragraph =
+      document.createElement(
+        "p"
       );
 
-      continue;
-
-    }
-
-    else {
-
-      element =
-        document.createElement(
-          "p"
-        );
-
-      element.className =
-        "avayar-paragraph";
-
-    }
-
-
-    element.textContent =
-      block.text;
+    paragraph.textContent =
+      value;
 
     fragment.append(
-      element
+      paragraph
     );
-
   }
-
 
   elements.output.replaceChildren(
     fragment
   );
-
 }
 
-
-function renderSummary(text) {
-
-  const paragraph =
-    document.createElement(
-      "p"
-    );
-
-  paragraph.className =
-    "avayar-paragraph";
-
-  paragraph.textContent =
-    text;
-
-  elements.output.replaceChildren(
-    paragraph
-  );
-
-}
-
-
-async function translateBlocksToPersian(blocks) {
-
-  const translated = [];
-
-
-  for (const block of blocks) {
-
-    if (
-      /[\u0600-\u06ff]/u
-        .test(block.text)
-    ) {
-
-      translated.push(
-        block
-      );
-
-      continue;
-
-    }
-
-
-    const result =
-      await api({
-
-        path:
-          "/api/translate",
-
-        body:
-          {
-            text:
-              block.text
-          }
-
-      });
-
-
-    translated.push({
-
-      ...block,
-
-      text:
-        cleanText(
-          result.text
-        )
-
-    });
-
+function renderCurrentMode() {
+  if (!sourcePersianText) {
+    return;
   }
 
+  resetAudio();
 
-  return translated
-
-    .filter(
-      block =>
-        block.text
-    );
-
-}
-
-
-function removeNoiseBlocks(blocks) {
-
-  const noiseWords = [
-
-    "تبلیغ",
-    "اسپانسر",
-    "پیشنهاد ویژه",
-    "خرید",
-    "کد تخفیف",
-    "عضویت",
-    "ورود",
-    "اشتراک گذاری",
-    "share",
-    "subscribe"
-
-  ];
-
-
-  return blocks.filter(
-
-    block => {
-
-      const text =
-        block.text.toLowerCase();
-
-
-      const matched =
-        noiseWords.some(
-
-          word =>
-            text.includes(
-              word
-            )
-
-        );
-
-
-      return !matched;
-
-    }
-
-  );
-
-}
-
-
-function improveArticleStructure(blocks) {
-
-  const result = [];
-
-
-  for (
-    const block of blocks
+  if (
+    elements.mode.value ===
+    "summary"
   ) {
+    preparedText =
+      summarizePersian(
+        sourcePersianText
+      ).trim();
 
-    const text =
-      block.text.trim();
+    elements.modeBadge.textContent =
+      "خلاصه";
 
+    renderParagraphs(
+      preparedText
+    );
 
-    if (
-      text.length < 3
-    ) {
+    setStatus(
+      "خلاصه فارسی آماده پخش است."
+    );
+  } else {
+    preparedText =
+      sourcePersianText.trim();
 
-      continue;
+    elements.modeBadge.textContent =
+      "متن کامل";
 
-    }
+    renderParagraphs(
+      preparedText
+    );
 
-
-    result.push({
-
-      ...block,
-
-      text
-
-    });
-
+    setStatus(
+      "متن کامل فارسی آماده پخش است."
+    );
   }
 
-
-  return result;
-
+  elements.play.disabled =
+    !preparedText;
 }
-
 
 async function extract() {
-
-  elements.extract.disabled = true;
-
-  setStatus(
-    "در حال استخراج متن صفحه…"
+  setBusy(
+    true,
+    "در حال خواندن محتوای اصلی صفحه…"
   );
 
+  resetAudio();
 
   try {
-
     const tab =
       await currentTab();
-
 
     await ensurePageAccess(
       tab
     );
 
-
     await chrome.scripting.executeScript({
+      target: {
+        tabId:
+          tab.id
+      },
 
-      target:
-        {
-          tabId:
-            tab.id
-        },
-
-      files:
-        [
-          "readability.js",
-          "content-script.mjs"
-        ]
-
+      files: [
+        "readability.js",
+        "content-script.mjs"
+      ]
     });
-
 
     const extracted =
       await chrome.tabs.sendMessage(
-
         tab.id,
-
         {
           type:
             "AVAYAR_EXTRACT"
         }
-
       );
 
-
-    if (
-      !extracted?.ok
-    ) {
-
+    if (!extracted?.ok) {
       throw new Error(
-
         extracted?.error ||
-
-        "استخراج متن صفحه ناموفق بود."
-
+        "متن اصلی این صفحه قابل استخراج نبود."
       );
-
     }
 
-
     elements.title.textContent =
-      extracted.result.title;
+      extracted.result.title ||
+      "صفحه بدون عنوان";
 
-
-    const cleanedSourceText =
+    const source =
       cleanArticleText(
         extracted.result.text
       );
 
-
     if (
-      !cleanedSourceText ||
-      cleanedSourceText.length < 100
+      !source ||
+      source.length < 100
     ) {
-
       throw new Error(
-        "متن اصلی صفحه پس از پاک‌سازی کافی نیست."
+        "محتوای اصلی کافی برای خواندن پیدا نشد."
       );
-
     }
 
-
-    let fullText =
-      cleanedSourceText;
-
+    let persianText =
+      source;
 
     if (
       !/[\u0600-\u06ff]/u
-        .test(fullText)
+        .test(persianText)
     ) {
-
       setStatus(
-        "در حال ترجمه متن..."
+        "متن انگلیسی شناسایی شد؛ در حال آماده‌سازی نسخه فارسی…"
       );
-
 
       const translated =
         await api({
-
           path:
             "/api/translate",
 
-          body:
-            {
-              text:
-                fullText
-            }
-
+          body: {
+            text:
+              persianText
+          }
         });
 
-
-      fullText =
+      persianText =
         cleanArticleText(
           translated.text
         );
-
     }
 
-
     if (
-      !fullText ||
-      fullText.length < 100
+      !persianText ||
+      persianText.length < 100
     ) {
-
       throw new Error(
-        "متن فارسی آماده‌شده کافی نیست."
+        "نسخه فارسی آماده‌شده کافی نیست."
       );
-
     }
 
+    sourcePersianText =
+      persianText.trim();
 
-    if (
-      elements.mode.value ===
-      "summary"
-    ) {
-
-      const summary =
-        summarizePersian(
-          fullText
-        );
-
-
-      preparedText =
-        summary.trim();
-
-
-      renderSummary(
-        preparedText
-      );
-
-    } else {
-
-      preparedText =
-        fullText.trim();
-
-
-      renderSummary(
-        preparedText
-      );
-
-    }
-
-
-    elements.play.disabled =
-      !preparedText;
-
-
-    setStatus(
-      "خروجی فارسی آماده پخش است."
-    );
-
+    renderCurrentMode();
   }
-
   catch(error) {
-
     console.error(
-      "AvaYar extract error:",
+      "AvaYar extraction failed.",
       error
     );
 
+    sourcePersianText = "";
+    preparedText = "";
 
-    preparedText =
-      "";
+    resetAudio();
 
+    const empty =
+      document.createElement(
+        "p"
+      );
+
+    empty.className =
+      "empty";
+
+    empty.textContent =
+      "خروجی آماده نشد.";
+
+    elements.output.replaceChildren(
+      empty
+    );
 
     elements.play.disabled =
       true;
 
-
-    elements.output.replaceChildren();
-
-
     setStatus(
-
       error instanceof Error
-
         ? error.message
-
         : String(error),
-
       true
-
     );
-
   }
-
   finally {
-
-    elements.extract.disabled =
-      false;
-
+    setBusy(false);
   }
-
 }
+
 async function play() {
+  if (
+    !preparedText ||
+    busy
+  ) {
+    return;
+  }
 
   if (
-    !preparedText
+    elements.audio.src &&
+    elements.audio.paused &&
+    elements.audio.currentTime > 0 &&
+    !elements.audio.ended
   ) {
+    await elements.audio.play();
+
+    setStatus(
+      "پخش ادامه یافت."
+    );
 
     return;
-
   }
-
 
   elements.play.disabled =
     true;
 
-
   setStatus(
-    "در حال ساخت صدای فارسی…"
+    "در حال آماده‌سازی صدای فارسی…"
   );
 
-
   try {
-
     const result =
       await api({
-
         path:
           "/api/tts",
 
-        body:
-          {
+        body: {
+          text:
+            preparedText,
 
-            text:
-              preparedText,
-
-            voicePreference:
-              elements.voice.value
-
-          },
+          voicePreference:
+            elements.voice.value
+        },
 
         responseType:
           "audio"
-
       });
 
-
-    if (
-      audioUrl
-    ) {
-
-      URL.revokeObjectURL(
-        audioUrl
-      );
-
-    }
-
+    revokeAudio();
 
     const blob =
       new Blob(
-
         [
           new Uint8Array(
             result.bytes
           )
         ],
-
         {
           type:
-            result.contentType
+            result.contentType ||
+            "audio/wav"
         }
-
       );
-
 
     audioUrl =
       URL.createObjectURL(
         blob
       );
 
-
     elements.audio.src =
       audioUrl;
 
-
     await elements.audio.play();
 
-
-    elements.pause.disabled =
-      false;
-
-
-    elements.stop.disabled =
-      false;
-
-
     setStatus(
-      `در حال پخش با صدای ${result.voiceName || "فارسی"}`
+      elements.voice.value ===
+        "female"
+        ? "در حال پخش با صدای زن."
+        : "در حال پخش با صدای مرد."
     );
-
   }
-
   catch(error) {
-
-    setStatus(
-
-      error instanceof Error
-
-        ? error.message
-
-        : String(error),
-
-      true
-
-    );
-
-  }
-
-  finally {
-
     elements.play.disabled =
       false;
 
-  }
-
-}
-
-
-async function saveSettings() {
-
-  try {
-
-    const url =
-      new URL(
-        elements.apiBase.value
-      );
-
-
-    await chrome.storage.local.set({
-
-      apiBase:
-        url.origin
-
-    });
-
-
-    elements.apiBase.value =
-      url.origin;
-
-
     setStatus(
-      "تنظیم سرور ذخیره شد."
-    );
-
-  }
-
-  catch(error) {
-
-    setStatus(
-
-      "آدرس سرور معتبر نیست.",
-
+      error instanceof Error
+        ? error.message
+        : String(error),
       true
-
     );
-
   }
-
 }
 
+function pause() {
+  if (
+    elements.audio.paused ||
+    !elements.audio.src
+  ) {
+    return;
+  }
+
+  elements.audio.pause();
+
+  elements.play.disabled =
+    false;
+
+  elements.play.textContent =
+    "ادامه";
+
+  elements.pause.disabled =
+    true;
+
+  setStatus(
+    "پخش مکث شد."
+  );
+}
+
+function stop() {
+  if (!elements.audio.src) {
+    return;
+  }
+
+  elements.audio.pause();
+
+  elements.audio.currentTime =
+    0;
+
+  elements.play.disabled =
+    !preparedText;
+
+  elements.play.textContent =
+    "پخش";
+
+  elements.pause.disabled =
+    true;
+
+  elements.stop.disabled =
+    true;
+
+  setStatus(
+    "پخش متوقف شد."
+  );
+}
 
 elements.extract.addEventListener(
   "click",
   extract
 );
 
+elements.mode.addEventListener(
+  "change",
+  () => {
+    if (sourcePersianText) {
+      renderCurrentMode();
+    }
+  }
+);
+
+elements.voice.addEventListener(
+  "change",
+  () => {
+    resetAudio();
+
+    if (preparedText) {
+      setStatus(
+        "صدا تغییر کرد؛ برای شنیدن، پخش را بزن."
+      );
+    }
+  }
+);
 
 elements.play.addEventListener(
   "click",
   play
 );
 
-
 elements.pause.addEventListener(
   "click",
-  () => {
-
-    elements.audio.pause();
-
-
-    setStatus(
-      "پخش مکث شد."
-    );
-
-  }
+  pause
 );
-
 
 elements.stop.addEventListener(
   "click",
+  stop
+);
+
+elements.audio.addEventListener(
+  "playing",
   () => {
+    elements.play.disabled =
+      true;
 
-    elements.audio.pause();
+    elements.play.textContent =
+      "پخش";
 
+    elements.pause.disabled =
+      false;
 
-    elements.audio.currentTime =
-      0;
-
-
-    setStatus(
-      "پخش متوقف شد."
-    );
-
+    elements.stop.disabled =
+      false;
   }
 );
 
+elements.audio.addEventListener(
+  "ended",
+  () => {
+    elements.play.disabled =
+      !preparedText;
 
-elements.saveSettings.addEventListener(
-  "click",
-  saveSettings
+    elements.play.textContent =
+      "پخش";
+
+    elements.pause.disabled =
+      true;
+
+    elements.stop.disabled =
+      true;
+
+    setStatus(
+      "پخش به پایان رسید."
+    );
+  }
 );
 
+elements.audio.addEventListener(
+  "error",
+  () => {
+    elements.play.disabled =
+      !preparedText;
 
-const stored =
-  await chrome.storage.local.get(
-    "apiBase"
-  );
+    elements.pause.disabled =
+      true;
 
+    elements.stop.disabled =
+      true;
 
-if (
-  stored.apiBase
-) {
-
-  elements.apiBase.value =
-    stored.apiBase;
-
-}
+    setStatus(
+      "پخش صدا با خطا روبه‌رو شد.",
+      true
+    );
+  }
+);
