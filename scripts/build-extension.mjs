@@ -191,12 +191,24 @@ manifest.version =
 if (
   mode === "production"
 ) {
+  const productionApiOrigin =
+    new URL(
+      productionApiBase
+    ).origin;
+
   manifest.host_permissions =
-    (manifest.host_permissions || [])
+    [
+      ...(manifest.host_permissions || [])
+        .filter(
+          permission =>
+            !permission.includes("127.0.0.1") &&
+            !permission.includes("localhost")
+        ),
+      `${productionApiOrigin}/*`
+    ]
       .filter(
-        permission =>
-          !permission.includes("127.0.0.1") &&
-          !permission.includes("localhost")
+        (permission, index, values) =>
+          values.indexOf(permission) === index
       );
 }
 
