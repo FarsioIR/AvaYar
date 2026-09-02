@@ -19,17 +19,26 @@ child.stderr.on("data", (chunk) => {
 try {
   let response = null;
 
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  const startupDeadline = Date.now() + 30_000;
+
+  while (Date.now() < startupDeadline) {
+    if (child.exitCode !== null) {
+      throw new Error(
+        `Ava smoke server exited before becoming healthy (exit ${child.exitCode}). ${stderr}`
+      );
+    }
+
     try {
       response = await fetch(`http://127.0.0.1:${port}/healthz`);
+
       if (response.ok) {
         break;
       }
     } catch {
-      // Server can take a moment to bind.
+      // Clean installs can require extra startup time on Windows.
     }
 
-    await delay(100);
+    await delay(250);
   }
 
   if (!response?.ok) {
