@@ -32,16 +32,17 @@ jobs:
       - name: Full AvaYar quality gate
         run: npm run check
 
-      - name: Validate Cloudflare bundle
-        run: npx --yes wrangler@latest deploy cloudflare/worker.mjs --name avayar-runtime-preview --compatibility-date 2026-09-03 --dry-run
+      - name: Validate Cloudflare bundle and bindings
+        run: npx --yes wrangler@latest deploy --name avayar-runtime-preview --dry-run
 
       - name: Deploy isolated preview Worker
         id: deploy
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy cloudflare/worker.mjs --name avayar-runtime-preview --compatibility-date 2026-09-03
+          wranglerVersion: "4"
+          command: deploy --name avayar-runtime-preview
 
       - name: Normalize deployment URL
         id: runtime
@@ -79,9 +80,8 @@ jobs:
                 process.stdin.on("data", chunk => body += chunk);
                 process.stdin.on("end", () => {
                   const value = JSON.parse(body);
-                  if (value.ok !== true || value.status !== "ready" || value.product !== "AvaYar") {
-                    process.exit(1);
-                  }
+                  if (value.ok !== true || value.status !== "ready" || value.product !== "AvaYar") process.exit(1);
+                  if (value.capabilities?.translation !== "cloudflare-workers-ai") process.exit(1);
                   console.log("Preview health PASS", value);
                 });
               '
@@ -93,6 +93,45 @@ jobs:
           echo "Preview health did not become ready." >&2
           exit 1
 
+      - name: E2E smoke English to Persian translation
+        env:
+          RUNTIME_URL: ${{ steps.runtime.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 60 \
+            -H 'content-type: application/json' \
+            --data '{"text":"Technology helps people read and understand useful information."}' \
+            "$RUNTIME_URL/api/translate" \
+            | node -e '
+              let body="";
+              process.stdin.on("data", chunk => body += chunk);
+              process.stdin.on("end", () => {
+                const value = JSON.parse(body);
+                if (typeof value.text !== "string" || !/[\u0600-\u06ff]/u.test(value.text)) process.exit(1);
+                if (value.provider !== "cloudflare-m2m100") process.exit(1);
+                console.log("Translation E2E PASS", { provider: value.provider, text: value.text });
+              });
+            '
+
+      - name: E2E smoke speech fallback contract
+        env:
+          RUNTIME_URL: ${{ steps.runtime.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --max-time 15 -o /tmp/tts.json -w '%{http_code}' \
+            -H 'content-type: application/json' \
+            --data '{"text":"سلام از آوایار","voicePreference":"female"}' \
+            "$RUNTIME_URL/api/tts")"
+          test "$status" = "503"
+          node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/tts.json", "utf8"));
+            if (value.code !== "AVAYAR_SPEECH_BROWSER_FALLBACK_REQUIRED") process.exit(1);
+            console.log("Speech browser-fallback contract PASS");
+          '
+
       - name: Write deployment summary
         env:
           RUNTIME_URL: ${{ steps.runtime.outputs.url }}
@@ -103,7 +142,9 @@ jobs:
             echo "## AvaYar Cloudflare Preview"
             echo
             echo "- Runtime: \`$RUNTIME_URL\`"
-            echo "- Health: \`$RUNTIME_URL/health\`"
+            echo "- Health: PASS"
+            echo "- English → Persian: PASS via Workers AI M2M100"
+            echo "- Speech fallback contract: PASS"
             echo "- RC label: \`$RC_LABEL\`"
-            echo "- Next: migrate and validate required application routes, then use this runtime URL in the Extension RC workflow."
+            echo "- Next: package the Chrome/Edge RC against this verified runtime."
           } >> "$GITHUB_STEP_SUMMARY"
