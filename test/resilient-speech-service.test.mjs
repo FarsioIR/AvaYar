@@ -84,6 +84,30 @@ test("falls back after Gemini 403 without leaking provider error", async () => {
   assert.equal(JSON.stringify(result).includes(secretHtml), false);
 });
 
+test("uses fallback even when Gemini is not configured", async () => {
+  const service = new ResilientSpeechService({
+    config: {
+      ...config,
+      apiKey: null
+    },
+    fallbackFactory: ({ failure }) => {
+      assert.equal(failure.code, "speech_not_configured");
+      return {
+        synthesize: async () => audioResult("fallback-test")
+      };
+    }
+  });
+
+  const result = await service.synthesize({
+    text: "سلام",
+    voicePreference: "female"
+  });
+
+  assert.equal(result.provider, "fallback-test");
+  assert.equal(result.fallbackFrom, "gemini-tts");
+  assert.equal(result.fallbackReason, "speech_not_configured");
+});
+
 test("normalizes Gemini 403 into sanitized unavailable state", async () => {
   const secretHtml = "<html>403 forbidden sensitive upstream payload</html>";
 
