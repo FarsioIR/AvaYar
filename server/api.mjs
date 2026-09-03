@@ -6,14 +6,15 @@ import {
   LocalM2M100Translator
 } from "./providers/local-m2m100-translator.mjs";
 import {
-  GeminiPersianSpeechSynthesizer
-} from "./providers/gemini-speech.mjs";
-import {
   GeminiPersianTranslator
 } from "./providers/gemini-translation.mjs";
 import {
   WebpageExtractor
 } from "./extraction/webpage-extractor.mjs";
+import {
+  ResilientSpeechService,
+  isSpeechUnavailableError
+} from "./speech/resilient-speech-service.mjs";
 
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -48,6 +49,8 @@ export function createApiHandler({
   translationPipelineFactory,
   translationLanguageDetector,
   speechFactory,
+  speechFallbackFactory,
+  speechServiceFactory,
   webpageExtractorFactory
 } = {}) {
   return async function handleApi(request, response) {
@@ -92,18 +95,13 @@ export function createApiHandler({
         const translator =
           config.translation.provider === "gemini"
             ? new GeminiPersianTranslator({
-                apiKey:
-                  config.translation.apiKey,
-                model:
-                  config.translation.model
+                apiKey: config.translation.apiKey,
+                model: config.translation.model
               })
             : new LocalM2M100Translator({
-                config:
-                  config.translation,
-                pipelineFactory:
-                  translationPipelineFactory,
-                languageDetector:
-                  translationLanguageDetector
+                config: config.translation,
+                pipelineFactory: translationPipelineFactory,
+                languageDetector: translationLanguageDetector
               });
 
         const text = await translator.translateToPersian(
@@ -119,8 +117,7 @@ export function createApiHandler({
         json(response, 200, {
           text,
           to: "fa",
-          provider:
-            config.translation.provider
+          provider: config.translation.provider
         });
         return true;
       }
@@ -132,26 +129,22 @@ export function createApiHandler({
         const body = await readJson(request);
         const config = getProviderConfig(env);
 
-        if (!config.speech.apiKey) {
-          throw new Error(
-            "Gemini Persian speech is not configured."
-          );
-        }
-
-        const synthesizer = speechFactory
-          ? speechFactory(config.speech)
-          : new GeminiPersianSpeechSynthesizer({
-              apiKey: config.speech.apiKey,
-              model: config.speech.model,
-              voices: config.speech.voices
+        const speechService = speechServiceFactory
+          ? speechServiceFactory(config.speech)
+          : new ResilientSpeechService({
+              config: config.speech,
+              primaryFactory: speechFactory
+                ? () => speechFactory(config.speech)
+                : undefined,
+              fallbackFactory: speechFallbackFactory ?? null
             });
 
-        const result = await synthesizer.synthesize({
+        const result = await speechService.synthesize({
           text: body.text,
           voicePreference: body.voicePreference
         });
 
-        response.writeHead(200, {
+        const headers = {
           "content-type": result.contentType,
           "cache-control": "no-store",
           "x-avayar-voice-name": result.voice.name,
@@ -161,7 +154,14 @@ export function createApiHandler({
           "x-avayar-speech-transport": result.transport,
           "x-avayar-speech-model": result.model,
           "x-avayar-speech-chunks": String(result.chunkCount)
-        });
+        };
+
+        if (result.fallbackFrom) {
+          headers["x-avayar-speech-fallback-from"] = result.fallbackFrom;
+          headers["x-avayar-speech-fallback-reason"] = result.fallbackReason;
+        }
+
+        response.writeHead(200, headers);
         response.end(result.audio);
         return true;
       }
@@ -171,6 +171,17 @@ export function createApiHandler({
       });
       return true;
     } catch (error) {
+      if (isSpeechUnavailableError(error)) {
+        json(response, 503, {
+          error: error.code,
+          message: error.message,
+          provider: error.provider,
+          retryable: error.retryable,
+          fallbackAttempted: error.fallbackAttempted
+        });
+        return true;
+      }
+
       json(response, 502, {
         error:
           error instanceof Error
