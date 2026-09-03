@@ -6,73 +6,59 @@ import {
   cleanArticleText
 } from "./core/content-cleaner.mjs";
 
+import {
+  BrowserSpeechController
+} from "./core/browser-speech.mjs";
+
 const elements = {
-  extract:
-    document.querySelector("#extract"),
-
-  mode:
-    document.querySelector("#mode"),
-
-  voice:
-    document.querySelector("#voice"),
-
-  status:
-    document.querySelector("#status"),
-
-  title:
-    document.querySelector("#title"),
-
-  modeBadge:
-    document.querySelector("#modeBadge"),
-
-  output:
-    document.querySelector("#output"),
-
-  play:
-    document.querySelector("#play"),
-
-  pause:
-    document.querySelector("#pause"),
-
-  stop:
-    document.querySelector("#stop"),
-
-  audio:
-    document.querySelector("#audio")
+  extract: document.querySelector("#extract"),
+  mode: document.querySelector("#mode"),
+  voice: document.querySelector("#voice"),
+  status: document.querySelector("#status"),
+  title: document.querySelector("#title"),
+  modeBadge: document.querySelector("#modeBadge"),
+  output: document.querySelector("#output"),
+  play: document.querySelector("#play"),
+  pause: document.querySelector("#pause"),
+  stop: document.querySelector("#stop"),
+  audio: document.querySelector("#audio")
 };
+
+const browserSpeech = new BrowserSpeechController({
+  synthesis: globalThis.speechSynthesis,
+  utteranceFactory:
+    typeof globalThis.SpeechSynthesisUtterance === "function"
+      ? (text) => new globalThis.SpeechSynthesisUtterance(text)
+      : null
+});
 
 let sourcePersianText = "";
 let preparedText = "";
 let audioUrl = null;
 let busy = false;
+let playbackMode = "none";
 
-function setStatus(
-  message,
-  isError = false
-) {
-  elements.status.textContent =
-    message;
-
-  elements.status.classList.toggle(
-    "error",
-    isError
-  );
+function setStatus(message, isError = false) {
+  elements.status.textContent = message;
+  elements.status.classList.toggle("error", isError);
 }
 
-function setBusy(
-  value,
-  message
-) {
+function setBusy(value, message) {
   busy = value;
+  elements.extract.disabled = value;
+  elements.mode.disabled = value;
+  elements.voice.disabled = value;
 
-  elements.extract.disabled =
-    value;
+  if (message) {
+    setStatus(message);
+  }
+}
 
-  elements.mode.disabled =
-    value;
-
-  elements.voice.disabled =
-    value;
+function idlePlaybackControls(message = null) {
+  elements.play.disabled = !preparedText;
+  elements.play.textContent = "پخش";
+  elements.pause.disabled = true;
+  elements.stop.disabled = true;
 
   if (message) {
     setStatus(message);
@@ -81,45 +67,31 @@ function setBusy(
 
 function revokeAudio() {
   if (audioUrl) {
-    URL.revokeObjectURL(
-      audioUrl
-    );
-
+    URL.revokeObjectURL(audioUrl);
     audioUrl = null;
   }
 
-  elements.audio.removeAttribute(
-    "src"
-  );
-
+  elements.audio.removeAttribute("src");
   elements.audio.load();
-
-  elements.pause.disabled = true;
-  elements.stop.disabled = true;
 }
 
-function resetAudio() {
+function resetPlayback() {
+  browserSpeech.cancel();
+
   if (!elements.audio.paused) {
     elements.audio.pause();
   }
 
   revokeAudio();
-
-  elements.play.disabled =
-    !preparedText;
-
-  elements.play.textContent =
-    "پخش";
+  playbackMode = "none";
+  idlePlaybackControls();
 }
 
 async function api(message) {
-  const response =
-    await chrome.runtime.sendMessage({
-      target:
-        "avayar-api",
-
-      ...message
-    });
+  const response = await chrome.runtime.sendMessage({
+    target: "avayar-api",
+    ...message
+  });
 
   if (!response?.ok) {
     throw new Error(
@@ -132,19 +104,15 @@ async function api(message) {
 }
 
 async function currentTab() {
-  const tabs =
-    await chrome.tabs.query({
-      active: true,
-      currentWindow: true
-    });
+  const tabs = await chrome.tabs.query({
+    active: true,
+    currentWindow: true
+  });
 
-  const tab =
-    tabs[0];
+  const tab = tabs[0];
 
   if (!tab?.id) {
-    throw new Error(
-      "صفحه فعال پیدا نشد."
-    );
+    throw new Error("صفحه فعال پیدا نشد.");
   }
 
   return tab;
@@ -152,45 +120,27 @@ async function currentTab() {
 
 async function ensurePageAccess(tab) {
   if (!tab.url) {
-    throw new Error(
-      "آدرس صفحه در دسترس نیست."
-    );
+    throw new Error("آدرس صفحه در دسترس نیست.");
   }
 
-  const url =
-    new URL(tab.url);
+  const url = new URL(tab.url);
 
-  if (
-    ![
-      "http:",
-      "https:"
-    ].includes(url.protocol)
-  ) {
-    throw new Error(
-      "آوایار فقط روی صفحات وب قابل استفاده است."
-    );
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error("آوایار فقط روی صفحات وب قابل استفاده است.");
   }
 
-  const originPattern =
-    `${url.origin}/*`;
-
-  const hasAccess =
-    await chrome.permissions.contains({
-      origins: [
-        originPattern
-      ]
-    });
+  const originPattern = `${url.origin}/*`;
+  const hasAccess = await chrome.permissions.contains({
+    origins: [originPattern]
+  });
 
   if (hasAccess) {
     return;
   }
 
-  const granted =
-    await chrome.permissions.request({
-      origins: [
-        originPattern
-      ]
-    });
+  const granted = await chrome.permissions.request({
+    origins: [originPattern]
+  });
 
   if (!granted) {
     throw new Error(
@@ -200,38 +150,19 @@ async function ensurePageAccess(tab) {
 }
 
 function renderParagraphs(text) {
-  const fragment =
-    document.createDocumentFragment();
+  const fragment = document.createDocumentFragment();
+  const paragraphs = String(text || "")
+    .split(/\n{2,}/u)
+    .map((value) => value.trim())
+    .filter(Boolean);
 
-  const paragraphs =
-    String(text || "")
-      .split(/\n{2,}/u)
-      .map(
-        (value) =>
-          value.trim()
-      )
-      .filter(Boolean);
-
-  for (
-    const value
-    of paragraphs
-  ) {
-    const paragraph =
-      document.createElement(
-        "p"
-      );
-
-    paragraph.textContent =
-      value;
-
-    fragment.append(
-      paragraph
-    );
+  for (const value of paragraphs) {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = value;
+    fragment.append(paragraph);
   }
 
-  elements.output.replaceChildren(
-    fragment
-  );
+  elements.output.replaceChildren(fragment);
 }
 
 function renderCurrentMode() {
@@ -239,83 +170,40 @@ function renderCurrentMode() {
     return;
   }
 
-  resetAudio();
+  resetPlayback();
 
-  if (
-    elements.mode.value ===
-    "summary"
-  ) {
-    preparedText =
-      summarizePersian(
-        sourcePersianText
-      ).trim();
-
-    elements.modeBadge.textContent =
-      "خلاصه";
-
-    renderParagraphs(
-      preparedText
-    );
-
-    setStatus(
-      "خلاصه فارسی آماده پخش است."
-    );
+  if (elements.mode.value === "summary") {
+    preparedText = summarizePersian(sourcePersianText).trim();
+    elements.modeBadge.textContent = "خلاصه";
+    renderParagraphs(preparedText);
+    setStatus("خلاصه فارسی آماده پخش است.");
   } else {
-    preparedText =
-      sourcePersianText.trim();
-
-    elements.modeBadge.textContent =
-      "متن کامل";
-
-    renderParagraphs(
-      preparedText
-    );
-
-    setStatus(
-      "متن کامل فارسی آماده پخش است."
-    );
+    preparedText = sourcePersianText.trim();
+    elements.modeBadge.textContent = "متن کامل";
+    renderParagraphs(preparedText);
+    setStatus("متن کامل فارسی آماده پخش است.");
   }
 
-  elements.play.disabled =
-    !preparedText;
+  elements.play.disabled = !preparedText;
 }
 
 async function extract() {
-  setBusy(
-    true,
-    "در حال خواندن محتوای اصلی صفحه…"
-  );
-
-  resetAudio();
+  setBusy(true, "در حال خواندن محتوای اصلی صفحه…");
+  resetPlayback();
 
   try {
-    const tab =
-      await currentTab();
-
-    await ensurePageAccess(
-      tab
-    );
+    const tab = await currentTab();
+    await ensurePageAccess(tab);
 
     await chrome.scripting.executeScript({
-      target: {
-        tabId:
-          tab.id
-      },
-
-      files: [
-        "readability.js",
-        "content-script.mjs"
-      ]
+      target: { tabId: tab.id },
+      files: ["readability.js", "content-script.mjs"]
     });
 
-    const extracted =
-      await chrome.tabs.sendMessage(
-        tab.id,
-        {
-          type:
-            "AVAYAR_EXTRACT"
-        }
-      );
+    const extracted = await chrome.tabs.sendMessage(
+      tab.id,
+      { type: "AVAYAR_EXTRACT" }
+    );
 
     if (!extracted?.ok) {
       throw new Error(
@@ -328,90 +216,45 @@ async function extract() {
       extracted.result.title ||
       "صفحه بدون عنوان";
 
-    const source =
-      cleanArticleText(
-        extracted.result.text
-      );
+    const source = cleanArticleText(extracted.result.text);
 
-    if (
-      !source ||
-      source.length < 100
-    ) {
-      throw new Error(
-        "محتوای اصلی کافی برای خواندن پیدا نشد."
-      );
+    if (!source || source.length < 100) {
+      throw new Error("محتوای اصلی کافی برای خواندن پیدا نشد.");
     }
 
-    let persianText =
-      source;
+    let persianText = source;
 
-    if (
-      !/[\u0600-\u06ff]/u
-        .test(persianText)
-    ) {
+    if (!/[\u0600-\u06ff]/u.test(persianText)) {
       setStatus(
         "متن انگلیسی شناسایی شد؛ در حال آماده‌سازی نسخه فارسی…"
       );
 
-      const translated =
-        await api({
-          path:
-            "/api/translate",
+      const translated = await api({
+        path: "/api/translate",
+        body: { text: persianText }
+      });
 
-          body: {
-            text:
-              persianText
-          }
-        });
-
-      persianText =
-        cleanArticleText(
-          translated.text
-        );
+      persianText = cleanArticleText(translated.text);
     }
 
-    if (
-      !persianText ||
-      persianText.length < 100
-    ) {
-      throw new Error(
-        "نسخه فارسی آماده‌شده کافی نیست."
-      );
+    if (!persianText || persianText.length < 100) {
+      throw new Error("نسخه فارسی آماده‌شده کافی نیست.");
     }
 
-    sourcePersianText =
-      persianText.trim();
-
+    sourcePersianText = persianText.trim();
     renderCurrentMode();
-  }
-  catch(error) {
-    console.error(
-      "AvaYar extraction failed.",
-      error
-    );
+  } catch (error) {
+    console.error("AvaYar extraction failed.", error);
 
     sourcePersianText = "";
     preparedText = "";
+    resetPlayback();
 
-    resetAudio();
-
-    const empty =
-      document.createElement(
-        "p"
-      );
-
-    empty.className =
-      "empty";
-
-    empty.textContent =
-      "خروجی آماده نشد.";
-
-    elements.output.replaceChildren(
-      empty
-    );
-
-    elements.play.disabled =
-      true;
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "خروجی آماده نشد.";
+    elements.output.replaceChildren(empty);
+    elements.play.disabled = true;
 
     setStatus(
       error instanceof Error
@@ -419,108 +262,149 @@ async function extract() {
         : String(error),
       true
     );
-  }
-  finally {
+  } finally {
     setBusy(false);
   }
 }
 
+function browserPlaybackEnded() {
+  if (playbackMode !== "browser") {
+    return;
+  }
+
+  playbackMode = "none";
+  idlePlaybackControls("پخش به پایان رسید.");
+}
+
+function browserPlaybackFailed() {
+  if (playbackMode !== "browser") {
+    return;
+  }
+
+  playbackMode = "none";
+  idlePlaybackControls();
+  setStatus("پخش صدای جایگزین مرورگر با خطا روبه‌رو شد.", true);
+}
+
+async function playBrowserFallback() {
+  playbackMode = "browser";
+
+  const result = await browserSpeech.speak({
+    text: preparedText,
+    voicePreference: elements.voice.value,
+    onStart: () => {
+      elements.play.disabled = true;
+      elements.play.textContent = "پخش";
+      elements.pause.disabled = false;
+      elements.stop.disabled = false;
+      setStatus("Gemini در دسترس نیست؛ پخش با صدای فارسی مرورگر ادامه دارد.");
+    },
+    onEnd: browserPlaybackEnded,
+    onError: browserPlaybackFailed
+  });
+
+  return result;
+}
+
 async function play() {
-  if (
-    !preparedText ||
-    busy
-  ) {
+  if (!preparedText || busy) {
+    return;
+  }
+
+  if (playbackMode === "browser" && browserSpeech.paused) {
+    browserSpeech.resume();
+    elements.play.disabled = true;
+    elements.play.textContent = "پخش";
+    elements.pause.disabled = false;
+    elements.stop.disabled = false;
+    setStatus("پخش صدای جایگزین ادامه یافت.");
     return;
   }
 
   if (
+    playbackMode === "server" &&
     elements.audio.src &&
     elements.audio.paused &&
     elements.audio.currentTime > 0 &&
     !elements.audio.ended
   ) {
     await elements.audio.play();
-
-    setStatus(
-      "پخش ادامه یافت."
-    );
-
+    setStatus("پخش ادامه یافت.");
     return;
   }
 
-  elements.play.disabled =
-    true;
-
-  setStatus(
-    "در حال آماده‌سازی صدای فارسی…"
-  );
+  elements.play.disabled = true;
+  setStatus("در حال آماده‌سازی صدای فارسی…");
 
   try {
-    const result =
-      await api({
-        path:
-          "/api/tts",
+    const result = await api({
+      path: "/api/tts",
+      body: {
+        text: preparedText,
+        voicePreference: elements.voice.value
+      },
+      responseType: "audio"
+    });
 
-        body: {
-          text:
-            preparedText,
-
-          voicePreference:
-            elements.voice.value
-        },
-
-        responseType:
-          "audio"
-      });
-
+    browserSpeech.cancel();
     revokeAudio();
 
-    const blob =
-      new Blob(
-        [
-          new Uint8Array(
-            result.bytes
-          )
-        ],
-        {
-          type:
-            result.contentType ||
-            "audio/wav"
-        }
-      );
+    const blob = new Blob(
+      [new Uint8Array(result.bytes)],
+      {
+        type:
+          result.contentType ||
+          "audio/wav"
+      }
+    );
 
-    audioUrl =
-      URL.createObjectURL(
-        blob
-      );
-
-    elements.audio.src =
-      audioUrl;
+    audioUrl = URL.createObjectURL(blob);
+    elements.audio.src = audioUrl;
+    playbackMode = "server";
 
     await elements.audio.play();
 
     setStatus(
-      elements.voice.value ===
-        "female"
+      elements.voice.value === "female"
         ? "در حال پخش با صدای زن."
         : "در حال پخش با صدای مرد."
     );
-  }
-  catch(error) {
-    elements.play.disabled =
-      false;
+  } catch (serverError) {
+    revokeAudio();
 
-    setStatus(
-      error instanceof Error
-        ? error.message
-        : String(error),
-      true
-    );
+    try {
+      await playBrowserFallback();
+    } catch (fallbackError) {
+      playbackMode = "none";
+      idlePlaybackControls();
+
+      setStatus(
+        fallbackError instanceof Error
+          ? fallbackError.message
+          : serverError instanceof Error
+            ? serverError.message
+            : "صدای فارسی در دسترس نیست.",
+        true
+      );
+    }
   }
 }
 
 function pause() {
+  if (playbackMode === "browser") {
+    if (!browserSpeech.pause()) {
+      return;
+    }
+
+    elements.play.disabled = false;
+    elements.play.textContent = "ادامه";
+    elements.pause.disabled = true;
+    setStatus("پخش مکث شد.");
+    return;
+  }
+
   if (
+    playbackMode !== "server" ||
     elements.audio.paused ||
     !elements.audio.src
   ) {
@@ -528,143 +412,73 @@ function pause() {
   }
 
   elements.audio.pause();
-
-  elements.play.disabled =
-    false;
-
-  elements.play.textContent =
-    "ادامه";
-
-  elements.pause.disabled =
-    true;
-
-  setStatus(
-    "پخش مکث شد."
-  );
+  elements.play.disabled = false;
+  elements.play.textContent = "ادامه";
+  elements.pause.disabled = true;
+  setStatus("پخش مکث شد.");
 }
 
 function stop() {
-  if (!elements.audio.src) {
+  if (playbackMode === "browser") {
+    browserSpeech.cancel();
+    playbackMode = "none";
+    idlePlaybackControls("پخش متوقف شد.");
+    return;
+  }
+
+  if (playbackMode !== "server" || !elements.audio.src) {
     return;
   }
 
   elements.audio.pause();
-
-  elements.audio.currentTime =
-    0;
-
-  elements.play.disabled =
-    !preparedText;
-
-  elements.play.textContent =
-    "پخش";
-
-  elements.pause.disabled =
-    true;
-
-  elements.stop.disabled =
-    true;
-
-  setStatus(
-    "پخش متوقف شد."
-  );
+  elements.audio.currentTime = 0;
+  playbackMode = "none";
+  idlePlaybackControls("پخش متوقف شد.");
 }
 
-elements.extract.addEventListener(
-  "click",
-  extract
-);
+elements.extract.addEventListener("click", extract);
 
-elements.mode.addEventListener(
-  "change",
-  () => {
-    if (sourcePersianText) {
-      renderCurrentMode();
-    }
+elements.mode.addEventListener("change", () => {
+  if (sourcePersianText) {
+    renderCurrentMode();
   }
-);
+});
 
-elements.voice.addEventListener(
-  "change",
-  () => {
-    resetAudio();
+elements.voice.addEventListener("change", () => {
+  resetPlayback();
 
-    if (preparedText) {
-      setStatus(
-        "صدا تغییر کرد؛ برای شنیدن، پخش را بزن."
-      );
-    }
+  if (preparedText) {
+    setStatus("صدا تغییر کرد؛ برای شنیدن، پخش را بزن.");
   }
-);
+});
 
-elements.play.addEventListener(
-  "click",
-  play
-);
+elements.play.addEventListener("click", play);
+elements.pause.addEventListener("click", pause);
+elements.stop.addEventListener("click", stop);
 
-elements.pause.addEventListener(
-  "click",
-  pause
-);
+elements.audio.addEventListener("playing", () => {
+  playbackMode = "server";
+  elements.play.disabled = true;
+  elements.play.textContent = "پخش";
+  elements.pause.disabled = false;
+  elements.stop.disabled = false;
+});
 
-elements.stop.addEventListener(
-  "click",
-  stop
-);
-
-elements.audio.addEventListener(
-  "playing",
-  () => {
-    elements.play.disabled =
-      true;
-
-    elements.play.textContent =
-      "پخش";
-
-    elements.pause.disabled =
-      false;
-
-    elements.stop.disabled =
-      false;
+elements.audio.addEventListener("ended", () => {
+  if (playbackMode !== "server") {
+    return;
   }
-);
 
-elements.audio.addEventListener(
-  "ended",
-  () => {
-    elements.play.disabled =
-      !preparedText;
+  playbackMode = "none";
+  idlePlaybackControls("پخش به پایان رسید.");
+});
 
-    elements.play.textContent =
-      "پخش";
-
-    elements.pause.disabled =
-      true;
-
-    elements.stop.disabled =
-      true;
-
-    setStatus(
-      "پخش به پایان رسید."
-    );
+elements.audio.addEventListener("error", () => {
+  if (playbackMode !== "server") {
+    return;
   }
-);
 
-elements.audio.addEventListener(
-  "error",
-  () => {
-    elements.play.disabled =
-      !preparedText;
-
-    elements.pause.disabled =
-      true;
-
-    elements.stop.disabled =
-      true;
-
-    setStatus(
-      "پخش صدا با خطا روبه‌رو شد.",
-      true
-    );
-  }
-);
+  playbackMode = "none";
+  idlePlaybackControls();
+  setStatus("پخش صدا با خطا روبه‌رو شد.", true);
+});
