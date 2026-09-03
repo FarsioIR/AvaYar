@@ -1,0 +1,7 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "avayar-runtime",
+  "main": "cloudflare/worker.mjs",
+  "compatibility_date": "2026-09-03",
+  "workers_dev": true
+}
