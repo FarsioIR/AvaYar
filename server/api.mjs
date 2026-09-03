@@ -3,18 +3,16 @@ import {
   getProviderCapabilities
 } from "./config.mjs";
 import {
-  LocalM2M100Translator
-} from "./providers/local-m2m100-translator.mjs";
-import {
-  GeminiPersianTranslator
-} from "./providers/gemini-translation.mjs";
-import {
   WebpageExtractor
 } from "./extraction/webpage-extractor.mjs";
 import {
   ResilientSpeechService,
   isSpeechUnavailableError
 } from "./speech/resilient-speech-service.mjs";
+import {
+  ResilientTranslationService,
+  isTranslationUnavailableError
+} from "./translation/resilient-translation-service.mjs";
 
 const MAX_JSON_BYTES = 128 * 1024;
 
@@ -48,6 +46,9 @@ export function createApiHandler({
   env = process.env,
   translationPipelineFactory,
   translationLanguageDetector,
+  translationPrimaryFactory,
+  translationFallbackFactory,
+  translationServiceFactory,
   speechFactory,
   speechFallbackFactory,
   speechServiceFactory,
@@ -92,19 +93,17 @@ export function createApiHandler({
         const body = await readJson(request);
         const config = getProviderConfig(env);
 
-        const translator =
-          config.translation.provider === "gemini"
-            ? new GeminiPersianTranslator({
-                apiKey: config.translation.apiKey,
-                model: config.translation.model
-              })
-            : new LocalM2M100Translator({
-                config: config.translation,
-                pipelineFactory: translationPipelineFactory,
-                languageDetector: translationLanguageDetector
-              });
+        const translationService = translationServiceFactory
+          ? translationServiceFactory(config.translation)
+          : new ResilientTranslationService({
+              config: config.translation,
+              primaryFactory: translationPrimaryFactory,
+              fallbackFactory: translationFallbackFactory,
+              pipelineFactory: translationPipelineFactory,
+              languageDetector: translationLanguageDetector
+            });
 
-        const text = await translator.translateToPersian(
+        const result = await translationService.translateToPersian(
           body.text,
           {
             sourceLanguage:
@@ -115,9 +114,15 @@ export function createApiHandler({
         );
 
         json(response, 200, {
-          text,
+          text: result.text,
           to: "fa",
-          provider: config.translation.provider
+          provider: result.provider,
+          ...(result.fallbackFrom
+            ? {
+                fallbackFrom: result.fallbackFrom,
+                fallbackReason: result.fallbackReason
+              }
+            : {})
         });
         return true;
       }
@@ -171,6 +176,17 @@ export function createApiHandler({
       });
       return true;
     } catch (error) {
+      if (isTranslationUnavailableError(error)) {
+        json(response, 503, {
+          error: error.code,
+          message: error.message,
+          provider: error.provider,
+          retryable: error.retryable,
+          fallbackAttempted: error.fallbackAttempted
+        });
+        return true;
+      }
+
       if (isSpeechUnavailableError(error)) {
         json(response, 503, {
           error: error.code,
