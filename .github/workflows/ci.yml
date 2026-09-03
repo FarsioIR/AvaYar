@@ -44,3 +44,9 @@ jobs:
 
       - name: Manifest V3 package check
         run: npm run check:extension
+
+      - name: Production RC packaging readiness
+        env:
+          AVAYAR_PRODUCTION_API_BASE: https://rc-validation.invalid
+          AVAYAR_RC_LABEL: ci
+        run: npm run check:extension:rc
