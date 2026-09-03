@@ -22,7 +22,9 @@
     "dev:windows": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/start-avayar-windows.ps1",
     "start": "node scripts/production-server.mjs",
     "build:extension:production": "node scripts/build-production-extension.mjs",
-    "check:extension:production": "node scripts/check-production-extension.mjs"
+    "check:extension:production": "node scripts/check-production-extension.mjs",
+    "prepare:extension:rc": "node scripts/prepare-extension-rc.mjs",
+    "check:extension:rc": "npm run build:extension:production && npm run check:extension:production && npm run prepare:extension:rc"
   },
   "dependencies": {
     "@google/genai": "2.16.0",
