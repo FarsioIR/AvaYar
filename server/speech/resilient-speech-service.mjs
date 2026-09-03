@@ -96,12 +96,55 @@ export class ResilientSpeechService {
     this.fallbackFactory = fallbackFactory;
   }
 
+  async tryFallback(request, failure) {
+    if (typeof this.fallbackFactory !== "function") {
+      return null;
+    }
+
+    try {
+      const fallback = this.fallbackFactory({
+        config: this.config,
+        failure
+      });
+
+      if (!fallback || typeof fallback.synthesize !== "function") {
+        return null;
+      }
+
+      const result = await fallback.synthesize(request);
+      return {
+        ...result,
+        fallbackFrom: "gemini-tts",
+        fallbackReason: failure.code
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  unavailable(failure) {
+    throw new SpeechUnavailableError({
+      code: failure.code,
+      upstreamStatus: failure.status,
+      retryable: failure.retryable,
+      fallbackAttempted: typeof this.fallbackFactory === "function"
+    });
+  }
+
   async synthesize(request) {
     if (!this.config.apiKey) {
-      throw new SpeechUnavailableError({
+      const failure = {
         code: "speech_not_configured",
+        status: 0,
         retryable: false
-      });
+      };
+
+      const fallbackResult = await this.tryFallback(request, failure);
+      if (fallbackResult) {
+        return fallbackResult;
+      }
+
+      return this.unavailable(failure);
     }
 
     try {
@@ -109,33 +152,13 @@ export class ResilientSpeechService {
       return await primary.synthesize(request);
     } catch (primaryError) {
       const failure = classifySpeechFailure(primaryError);
+      const fallbackResult = await this.tryFallback(request, failure);
 
-      if (typeof this.fallbackFactory === "function") {
-        try {
-          const fallback = this.fallbackFactory({
-            config: this.config,
-            failure
-          });
-
-          if (fallback && typeof fallback.synthesize === "function") {
-            const result = await fallback.synthesize(request);
-            return {
-              ...result,
-              fallbackFrom: "gemini-tts",
-              fallbackReason: failure.code
-            };
-          }
-        } catch {
-          // Never expose fallback-provider internals to API consumers.
-        }
+      if (fallbackResult) {
+        return fallbackResult;
       }
 
-      throw new SpeechUnavailableError({
-        code: failure.code,
-        upstreamStatus: failure.status,
-        retryable: failure.retryable,
-        fallbackAttempted: typeof this.fallbackFactory === "function"
-      });
+      return this.unavailable(failure);
     }
   }
 }
