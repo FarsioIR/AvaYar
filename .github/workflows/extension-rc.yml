@@ -1,0 +1,81 @@
+name: AvaYar Extension RC
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "Final HTTPS AvaYar API origin, e.g. https://api.example.com"
+        required: true
+        type: string
+      rc_label:
+        description: "Release candidate label"
+        required: false
+        default: "rc"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Full quality gate
+        run: npm run check
+
+      - name: Build and validate production RC
+        env:
+          AVAYAR_PRODUCTION_API_BASE: ${{ inputs.api_base }}
+          AVAYAR_RC_LABEL: ${{ inputs.rc_label }}
+        run: npm run check:extension:rc
+
+      - name: Package Chrome and Edge ZIP
+        env:
+          RC_LABEL: ${{ inputs.rc_label }}
+        run: |
+          set -euo pipefail
+          SAFE_LABEL="$(printf '%s' "$RC_LABEL" | tr -cs 'A-Za-z0-9._-' '-')"
+          VERSION="$(node -p "require('./package.json').version")"
+          ARCHIVE="avayar-${VERSION}-${SAFE_LABEL}-chrome-edge.zip"
+          mkdir -p dist-rc
+          (cd dist-extension && zip -qr "../dist-rc/${ARCHIVE}" .)
+          sha256sum "dist-rc/${ARCHIVE}" > "dist-rc/${ARCHIVE}.sha256"
+          printf 'archive=%s\n' "$ARCHIVE" >> "$GITHUB_OUTPUT"
+        id: package
+
+      - name: Verify archive has Manifest V3 package
+        run: |
+          set -euo pipefail
+          unzip -l "dist-rc/${{ steps.package.outputs.archive }}"
+          unzip -p "dist-rc/${{ steps.package.outputs.archive }}" manifest.json | node -e '
+            let body="";
+            process.stdin.on("data", c => body += c);
+            process.stdin.on("end", () => {
+              const manifest = JSON.parse(body);
+              if (manifest.manifest_version !== 3) process.exit(1);
+              console.log(`Verified Manifest V${manifest.manifest_version}, version ${manifest.version}`);
+            });
+          '
+
+      - name: Upload RC artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avayar-extension-${{ inputs.rc_label }}
+          path: |
+            dist-rc/*.zip
+            dist-rc/*.sha256
+            dist-rc/rc-metadata.json
+          if-no-files-found: error
+          retention-days: 14
