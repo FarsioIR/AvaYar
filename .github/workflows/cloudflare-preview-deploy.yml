@@ -33,7 +33,7 @@ jobs:
         run: npm run check
 
       - name: Validate Cloudflare bundle
-        run: npx --yes wrangler@latest deploy --dry-run
+        run: npx --yes wrangler@latest deploy cloudflare/worker.mjs --name avayar-runtime-preview --compatibility-date 2026-09-03 --dry-run
 
       - name: Deploy isolated preview Worker
         id: deploy
@@ -41,7 +41,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --name avayar-runtime-preview
+          command: deploy cloudflare/worker.mjs --name avayar-runtime-preview --compatibility-date 2026-09-03
 
       - name: Normalize deployment URL
         id: runtime
