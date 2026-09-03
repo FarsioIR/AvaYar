@@ -1,6 +1,16 @@
 name: AvaYar Cloudflare Preview Deploy
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudflare/**"
+      - "wrangler.jsonc"
+      - "extension/**"
+      - "scripts/**extension**"
+      - "package.json"
+      - ".github/workflows/cloudflare-preview-deploy.yml"
   workflow_dispatch:
     inputs:
       rc_label:
@@ -10,7 +20,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy-preview:
@@ -132,19 +142,97 @@ jobs:
             console.log("Speech browser-fallback contract PASS");
           '
 
+      - name: Resolve RC metadata
+        id: rc
+        shell: bash
+        env:
+          INPUT_LABEL: ${{ inputs.rc_label }}
+        run: |
+          set -euo pipefail
+          LABEL="${INPUT_LABEL:-preview-${GITHUB_RUN_NUMBER}}"
+          SAFE_LABEL="$(printf '%s' "$LABEL" | tr -cs 'A-Za-z0-9._-' '-')"
+          SAFE_LABEL="${SAFE_LABEL%-}"
+          VERSION="$(node -p "require('./package.json').version")"
+          ARCHIVE="avayar-${VERSION}-${SAFE_LABEL}-chrome-edge.zip"
+          TAG="avayar-v${VERSION}-${SAFE_LABEL}"
+          echo "label=$SAFE_LABEL" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build and validate installable Extension RC
+        env:
+          AVAYAR_PRODUCTION_API_BASE: ${{ steps.runtime.outputs.url }}
+          AVAYAR_RC_LABEL: ${{ steps.rc.outputs.label }}
+        run: npm run check:extension:rc
+
+      - name: Package Chrome and Edge RC
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.rc.outputs.archive }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-rc
+          (cd dist-extension && zip -qr "../dist-rc/${ARCHIVE}" .)
+          sha256sum "dist-rc/${ARCHIVE}" > "dist-rc/${ARCHIVE}.sha256"
+          unzip -p "dist-rc/${ARCHIVE}" manifest.json | node -e '
+            let body="";
+            process.stdin.on("data", c => body += c);
+            process.stdin.on("end", () => {
+              const manifest = JSON.parse(body);
+              if (manifest.manifest_version !== 3) process.exit(1);
+              console.log(`Verified Manifest V${manifest.manifest_version}, version ${manifest.version}`);
+            });
+          '
+
+      - name: Upload installable RC artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avayar-extension-${{ steps.rc.outputs.label }}
+          path: |
+            dist-rc/*.zip
+            dist-rc/*.sha256
+            dist-rc/rc-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rc.outputs.tag }}
+          VERSION: ${{ steps.rc.outputs.version }}
+          LABEL: ${{ steps.rc.outputs.label }}
+          ARCHIVE: ${{ steps.rc.outputs.archive }}
+          RUNTIME_URL: ${{ steps.runtime.outputs.url }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            "dist-rc/${ARCHIVE}" \
+            "dist-rc/${ARCHIVE}.sha256" \
+            "dist-rc/rc-metadata.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AvaYar ${VERSION} ${LABEL}" \
+            --notes "Preview-validated Chrome/Edge RC. Runtime: ${RUNTIME_URL}. English→Persian Workers AI E2E: PASS. Browser speech fallback contract: PASS. Production remains unchanged." \
+            --prerelease
+
       - name: Write deployment summary
         env:
           RUNTIME_URL: ${{ steps.runtime.outputs.url }}
-          RC_LABEL: ${{ inputs.rc_label }}
+          RC_LABEL: ${{ steps.rc.outputs.label }}
+          ARCHIVE: ${{ steps.rc.outputs.archive }}
+          TAG: ${{ steps.rc.outputs.tag }}
         shell: bash
         run: |
           {
-            echo "## AvaYar Cloudflare Preview"
+            echo "## AvaYar Preview + RC"
             echo
             echo "- Runtime: \`$RUNTIME_URL\`"
             echo "- Health: PASS"
             echo "- English → Persian: PASS via Workers AI M2M100"
             echo "- Speech fallback contract: PASS"
-            echo "- RC label: \`$RC_LABEL\`"
-            echo "- Next: package the Chrome/Edge RC against this verified runtime."
+            echo "- Installable RC: \`$ARCHIVE\`"
+            echo "- GitHub prerelease tag: \`$TAG\`"
+            echo "- Production: unchanged"
           } >> "$GITHUB_STEP_SUMMARY"
