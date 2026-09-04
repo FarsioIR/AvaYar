@@ -10,6 +10,17 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/stable-candidate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "extension/**"
+      - "src/**"
+      - "scripts/**"
+      - "docs/STORE-READINESS-0.6.0.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/stable-candidate.yml"
   workflow_dispatch:
 
 permissions:
