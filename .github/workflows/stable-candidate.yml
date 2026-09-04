@@ -21,10 +21,13 @@ jobs:
     env:
       AVAYAR_PRODUCTION_API_BASE: https://avayar-runtime-preview.amotef.workers.dev
       AVAYAR_RC_LABEL: stable-candidate
+      AVAYAR_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -33,6 +36,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify exact source provenance
+        run: |
+          set -euo pipefail
+          ACTUAL="$(git rev-parse HEAD)"
+          test "$ACTUAL" = "$AVAYAR_SOURCE_SHA"
+          echo "Stable candidate source: $ACTUAL"
 
       - name: Full quality gate
         run: npm run check
@@ -78,6 +88,14 @@ jobs:
             echo 'Stable candidate contains a Google-key-like credential marker.' >&2
             exit 1
           fi
+          node - <<'NODE'
+          const fs = require('fs');
+          const metadata = JSON.parse(fs.readFileSync('dist-rc/rc-metadata.json', 'utf8'));
+          if (metadata.commit !== process.env.AVAYAR_SOURCE_SHA) {
+            throw new Error(`RC provenance mismatch: metadata=${metadata.commit} source=${process.env.AVAYAR_SOURCE_SHA}`);
+          }
+          console.log(`Stable candidate provenance PASS: ${metadata.commit}`);
+          NODE
           sha256sum -c "dist-rc/${{ steps.package.outputs.archive }}.sha256"
 
       - name: Upload stable candidate artifact
