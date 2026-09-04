@@ -14,6 +14,11 @@ const rcDir = resolve(root, "dist-rc");
 
 const apiBase = process.env.AVAYAR_PRODUCTION_API_BASE?.trim();
 const rcLabel = (process.env.AVAYAR_RC_LABEL || "rc").trim();
+const sourceSha = (
+  process.env.AVAYAR_SOURCE_SHA ||
+  process.env.GITHUB_SHA ||
+  ""
+).trim() || null;
 
 if (!apiBase) {
   throw new Error("AVAYAR_PRODUCTION_API_BASE is required for RC packaging.");
@@ -115,7 +120,7 @@ const metadata = {
   version: packageJson.version,
   rcLabel,
   apiOrigin: apiUrl.origin,
-  commit: process.env.GITHUB_SHA || null,
+  commit: sourceSha,
   fileCount: inventory.length,
   files: inventory
 };
