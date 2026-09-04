@@ -1,0 +1,92 @@
+name: AvaYar Stable Candidate
+
+on:
+  pull_request:
+    paths:
+      - "extension/**"
+      - "src/**"
+      - "scripts/**"
+      - "docs/STORE-READINESS-0.6.0.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/stable-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    env:
+      AVAYAR_PRODUCTION_API_BASE: https://avayar-runtime-preview.amotef.workers.dev
+      AVAYAR_RC_LABEL: stable-candidate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Full quality gate
+        run: npm run check
+
+      - name: Build and validate stable candidate
+        run: npm run check:extension:rc
+
+      - name: Package Chrome and Edge stable candidate
+        id: package
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          ARCHIVE="avayar-${VERSION}-stable-candidate-chrome-edge.zip"
+          mkdir -p dist-rc
+          (cd dist-extension && zip -qr "../dist-rc/${ARCHIVE}" .)
+          sha256sum "dist-rc/${ARCHIVE}" > "dist-rc/${ARCHIVE}.sha256"
+          printf 'archive=%s\n' "$ARCHIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify stable candidate contract
+        run: |
+          set -euo pipefail
+          ARCHIVE="dist-rc/${{ steps.package.outputs.archive }}"
+          unzip -p "$ARCHIVE" manifest.json > /tmp/manifest.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('/tmp/manifest.json', 'utf8'));
+          if (manifest.manifest_version !== 3) throw new Error('Manifest V3 required');
+          if (manifest.version !== '0.6.0') throw new Error(`Expected 0.6.0, got ${manifest.version}`);
+          const hosts = manifest.host_permissions || [];
+          if (hosts.some((h) => h.includes('localhost') || h.includes('127.0.0.1'))) {
+            throw new Error('Stable candidate contains localhost host permission');
+          }
+          if (!hosts.includes('https://avayar-runtime-preview.amotef.workers.dev/*')) {
+            throw new Error('Stable candidate is missing verified HTTPS runtime host permission');
+          }
+          console.log('Stable candidate manifest PASS');
+          NODE
+          if unzip -p "$ARCHIVE" service-worker.mjs | grep -Eq 'localhost|127\.0\.0\.1|__AVAYAR_|DEFAULT_DEVELOPMENT_API_BASE|developerApiBase'; then
+            echo 'Stable candidate contains a forbidden development marker.' >&2
+            exit 1
+          fi
+          if unzip -p "$ARCHIVE" service-worker.mjs | grep -Eq 'AIza[0-9A-Za-z_-]{20,}'; then
+            echo 'Stable candidate contains a Google-key-like credential marker.' >&2
+            exit 1
+          fi
+          sha256sum -c "dist-rc/${{ steps.package.outputs.archive }}.sha256"
+
+      - name: Upload stable candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avayar-0.6.0-stable-candidate
+          path: |
+            dist-rc/*.zip
+            dist-rc/*.sha256
+            dist-rc/rc-metadata.json
+          if-no-files-found: error
+          retention-days: 14
