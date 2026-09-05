@@ -6,15 +6,28 @@ function request(path, options = {}) {
   return new Request(`https://avayar.test${path}`, options);
 }
 
-test("health exposes edge translation and browser speech capabilities", async () => {
-  const response = await worker.fetch(request("/health"), {});
+test("health exposes configured Gemini speech capability", async () => {
+  const response = await worker.fetch(
+    request("/health"),
+    { GEMINI_API_KEY: "test-key-for-capability-only" }
+  );
   const body = await response.json();
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.status, "ready");
   assert.equal(body.capabilities.translation, "cloudflare-workers-ai");
-  assert.equal(body.capabilities.speech, "browser-fallback");
+  assert.equal(body.capabilities.speech, "gemini-tts");
+  assert.equal(body.voices.female, "Sulafat");
+  assert.equal(body.voices.male, "Iapetus");
+});
+
+test("health reports speech not configured without server secret", async () => {
+  const response = await worker.fetch(request("/health"), {});
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.capabilities.speech, "not-configured");
 });
 
 test("Persian translation input passes through without AI", async () => {
@@ -93,7 +106,7 @@ test("translation failures are sanitized", async () => {
   assert.doesNotMatch(JSON.stringify(body), /provider secret detail/u);
 });
 
-test("TTS route deterministically requests browser fallback", async () => {
+test("TTS requires a server-side Gemini secret", async () => {
   const response = await worker.fetch(
     request("/api/tts", {
       method: "POST",
@@ -105,7 +118,22 @@ test("TTS route deterministically requests browser fallback", async () => {
   const body = await response.json();
 
   assert.equal(response.status, 503);
-  assert.equal(body.code, "AVAYAR_SPEECH_BROWSER_FALLBACK_REQUIRED");
-  assert.equal(body.retryable, true);
-  assert.equal(response.headers.get("retry-after"), "60");
+  assert.equal(body.code, "AVAYAR_SPEECH_NOT_CONFIGURED");
+  assert.equal(body.retryable, false);
+  assert.equal(body.fallbackAttempted, false);
+});
+
+test("TTS rejects empty input before contacting Gemini", async () => {
+  const response = await worker.fetch(
+    request("/api/tts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "", voicePreference: "male" })
+    }),
+    { GEMINI_API_KEY: "test-key-for-validation-only" }
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(body.code, "AVAYAR_TTS_INVALID_INPUT");
 });
