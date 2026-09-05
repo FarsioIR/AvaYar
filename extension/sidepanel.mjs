@@ -32,6 +32,8 @@ const browserSpeech = new BrowserSpeechController({
       : null
 });
 
+const AUDIO_REQUEST_TIMEOUT_MS = 90000;
+
 let sourcePersianText = "";
 let preparedText = "";
 let audioUrl = null;
@@ -101,6 +103,79 @@ async function api(message) {
   }
 
   return response.result;
+}
+
+function resolveRuntimeApiBaseFromManifest() {
+  const permissions = chrome.runtime.getManifest().host_permissions || [];
+
+  for (const pattern of permissions) {
+    if (typeof pattern !== "string" || !pattern.startsWith("https://")) {
+      continue;
+    }
+
+    try {
+      const url = new URL(pattern.replace(/\*+$/u, ""));
+
+      if (url.hostname.endsWith("workers.dev")) {
+        return url.origin;
+      }
+    } catch {
+      // Ignore malformed host-permission entries.
+    }
+  }
+
+  throw new Error("نسخه آوایار به سرویس صوتی آنلاین متصل نشده است.");
+}
+
+async function fetchServerAudio({ text, voicePreference }) {
+  const apiBase = resolveRuntimeApiBaseFromManifest();
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    AUDIO_REQUEST_TIMEOUT_MS
+  );
+
+  try {
+    const response = await fetch(`${apiBase}/api/tts`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ text, voicePreference }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        throw new Error("ظرفیت سرویس صدا موقتاً تکمیل است. کمی بعد دوباره تلاش کنید.");
+      }
+
+      throw new Error(
+        errorBody?.error ||
+        "سرویس صدای آوایار موقتاً در دسترس نیست."
+      );
+    }
+
+    const blob = await response.blob();
+
+    if (!blob.size) {
+      throw new Error("فایل صدای آوایار خالی دریافت شد.");
+    }
+
+    return blob;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        "آماده‌سازی صدا بیش از حد طول کشید. دوباره تلاش کن یا حالت خلاصه را انتخاب کن."
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function currentTab() {
@@ -337,26 +412,13 @@ async function play() {
   setStatus("در حال آماده‌سازی صدای فارسی…");
 
   try {
-    const result = await api({
-      path: "/api/tts",
-      body: {
-        text: preparedText,
-        voicePreference: elements.voice.value
-      },
-      responseType: "audio"
+    const blob = await fetchServerAudio({
+      text: preparedText,
+      voicePreference: elements.voice.value
     });
 
     browserSpeech.cancel();
     revokeAudio();
-
-    const blob = new Blob(
-      [new Uint8Array(result.bytes)],
-      {
-        type:
-          result.contentType ||
-          "audio/wav"
-      }
-    );
 
     audioUrl = URL.createObjectURL(blob);
     elements.audio.src = audioUrl;
@@ -379,10 +441,10 @@ async function play() {
       idlePlaybackControls();
 
       setStatus(
-        fallbackError instanceof Error
-          ? fallbackError.message
-          : serverError instanceof Error
-            ? serverError.message
+        serverError instanceof Error
+          ? serverError.message
+          : fallbackError instanceof Error
+            ? fallbackError.message
             : "صدای فارسی در دسترس نیست.",
         true
       );
