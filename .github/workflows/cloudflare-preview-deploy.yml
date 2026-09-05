@@ -45,6 +45,33 @@ jobs:
       - name: Validate Cloudflare bundle and bindings
         run: npx --yes wrangler@latest deploy --name avayar-runtime-preview --dry-run
 
+      - name: Validate Gemini speech secret availability
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY is required in the avayar-preview GitHub environment." >&2
+            exit 1
+          fi
+          if [ "${#GEMINI_API_KEY}" -lt 20 ]; then
+            echo "GEMINI_API_KEY does not look valid." >&2
+            exit 1
+          fi
+          echo "Gemini speech secret is available."
+
+      - name: Bind Gemini speech secret to isolated preview Worker
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GEMINI_API_KEY" \
+            | npx --yes wrangler@latest secret put GEMINI_API_KEY --name avayar-runtime-preview
+
       - name: Deploy isolated preview Worker
         id: deploy
         uses: cloudflare/wrangler-action@v4
@@ -92,6 +119,8 @@ jobs:
                   const value = JSON.parse(body);
                   if (value.ok !== true || value.status !== "ready" || value.product !== "AvaYar") process.exit(1);
                   if (value.capabilities?.translation !== "cloudflare-workers-ai") process.exit(1);
+                  if (value.capabilities?.speech !== "gemini-tts") process.exit(1);
+                  if (value.voices?.female !== "Sulafat" || value.voices?.male !== "Iapetus") process.exit(1);
                   console.log("Preview health PASS", value);
                 });
               '
@@ -100,7 +129,7 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Preview health did not become ready." >&2
+          echo "Preview health did not become ready with Gemini speech." >&2
           exit 1
 
       - name: E2E smoke English to Persian translation
@@ -115,7 +144,7 @@ jobs:
             "$RUNTIME_URL/api/translate" \
             | node -e '
               let body="";
-              process.stdin.on("data", chunk => body += chunk);
+              process.stdin.on("data", c => body += c);
               process.stdin.on("end", () => {
                 const value = JSON.parse(body);
                 if (typeof value.text !== "string" || !/[\u0600-\u06ff]/u.test(value.text)) process.exit(1);
@@ -124,23 +153,32 @@ jobs:
               });
             '
 
-      - name: E2E smoke speech fallback contract
+      - name: E2E real Persian speech female and male
         env:
           RUNTIME_URL: ${{ steps.runtime.outputs.url }}
         shell: bash
         run: |
           set -euo pipefail
-          status="$(curl --silent --show-error --max-time 15 -o /tmp/tts.json -w '%{http_code}' \
-            -H 'content-type: application/json' \
-            --data '{"text":"سلام از آوایار","voicePreference":"female"}' \
-            "$RUNTIME_URL/api/tts")"
-          test "$status" = "503"
-          node -e '
-            const fs = require("node:fs");
-            const value = JSON.parse(fs.readFileSync("/tmp/tts.json", "utf8"));
-            if (value.code !== "AVAYAR_SPEECH_BROWSER_FALLBACK_REQUIRED") process.exit(1);
-            console.log("Speech browser-fallback contract PASS");
-          '
+          mkdir -p /tmp/avayar-tts
+          for voice in female male; do
+            headers="/tmp/avayar-tts/${voice}.headers"
+            audio="/tmp/avayar-tts/${voice}.wav"
+            curl --fail --silent --show-error --max-time 120 \
+              -D "$headers" \
+              -o "$audio" \
+              -H 'content-type: application/json' \
+              --data "{\"text\":\"سلام، این یک آزمون واقعی صدای فارسی آوایار است.\",\"voicePreference\":\"${voice}\"}" \
+              "$RUNTIME_URL/api/tts"
+            test "$(wc -c < "$audio")" -gt 1000
+            head -c 4 "$audio" | grep -q 'RIFF'
+            grep -qi '^content-type: audio/wav' "$headers"
+            if [ "$voice" = "female" ]; then
+              grep -qi '^x-avayar-voice-name: Sulafat' "$headers"
+            else
+              grep -qi '^x-avayar-voice-name: Iapetus' "$headers"
+            fi
+            echo "Persian speech E2E PASS: $voice ($(wc -c < "$audio") bytes)"
+          done
 
       - name: Resolve RC metadata
         id: rc
@@ -214,7 +252,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "AvaYar ${VERSION} ${LABEL}" \
-            --notes "Preview-validated Chrome/Edge RC. Runtime: ${RUNTIME_URL}. English→Persian Workers AI E2E: PASS. Browser speech fallback contract: PASS. Production remains unchanged." \
+            --notes "Preview-validated Chrome/Edge RC. Runtime: ${RUNTIME_URL}. English→Persian Workers AI E2E: PASS. Gemini Persian female/male speech E2E: PASS. Production remains unchanged." \
             --prerelease
 
       - name: Write deployment summary
@@ -231,7 +269,8 @@ jobs:
             echo "- Runtime: \`$RUNTIME_URL\`"
             echo "- Health: PASS"
             echo "- English → Persian: PASS via Workers AI M2M100"
-            echo "- Speech fallback contract: PASS"
+            echo "- Persian speech female: PASS via Gemini TTS / Sulafat"
+            echo "- Persian speech male: PASS via Gemini TTS / Iapetus"
             echo "- Installable RC: \`$ARCHIVE\`"
             echo "- GitHub prerelease tag: \`$TAG\`"
             echo "- Production: unchanged"
