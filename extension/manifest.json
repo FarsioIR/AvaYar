@@ -23,7 +23,14 @@
     "type": "module"
   },
   "action": {
-    "default_title": "بازکردن آوایار"
+    "default_title": "بازکردن آوایار",
+    "default_popup": "sidepanel.html",
+    "default_icon": {
+      "16": "assets/avayar-mark-16.png",
+      "32": "assets/avayar-mark-32.png",
+      "48": "assets/avayar-mark-48.png",
+      "128": "assets/avayar-mark-128.png"
+    }
   },
   "side_panel": {
     "default_path": "sidepanel.html"
