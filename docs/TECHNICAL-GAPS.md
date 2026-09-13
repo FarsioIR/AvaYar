@@ -1,8 +1,12 @@
-# Technical Gaps
+# Technical Gaps — Historical M0/M1 Assessment
 
-## نتیجه ارزیابی ورودی
+> **Historical document.** This file records early M0/M1 engineering gaps. It is not the current AvaYar product-status or capability matrix.
+>
+> Current product authority: **AvaYar 0.6.0 Stable**, source SHA `20d9da845c32e9873d332fb12192b38521d21232`. See [`README.md`](../README.md) and the [Stable release](https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0).
 
-Blueprint اولیه شامل ایده، معماری پیشنهادی و بخش‌هایی از نمونه‌کد است، اما یک پروژه قابل Build کامل نیست.
+## نتیجه ارزیابی ورودی اولیه
+
+Blueprint اولیه شامل ایده، معماری پیشنهادی و بخش‌هایی از نمونه‌کد بود، اما در آن مرحله یک پروژه قابل Build کامل نبود.
 
 ## فایل‌ها و زیرساخت‌های مورد نیاز M1
 
@@ -21,7 +25,7 @@ Blueprint اولیه شامل ایده، معماری پیشنهادی و بخش
 - Product test PowerShell
 - Privacy و Security documentation
 
-## شکاف‌های رفتاری
+## شکاف‌های رفتاری ثبت‌شده در آن مرحله
 
 - Shortcut خلاصه سریع باید handler واقعی داشته باشد.
 - Context Menu باید جریان اصلی محصول را واقعاً اجرا کند.
@@ -32,9 +36,11 @@ Blueprint اولیه شامل ایده، معماری پیشنهادی و بخش
 - تعداد Voiceها باید با Implementation منطبق باشد.
 - Provider fallback باید واقعاً پیاده‌سازی و تست شود.
 
-## گیت M1
+این موارد، snapshot شکاف‌های تاریخی M0/M1 هستند و نباید به‌عنوان وضعیت فعلی Stable 0.6.0 خوانده شوند.
 
-M1 زمانی PASS است که:
+## گیت تاریخی M1
+
+M1 زمانی PASS تعریف شده بود که:
 
 ```text
 npm ci: PASS
@@ -45,3 +51,5 @@ Load Unpacked smoke: PASS
 scripts/Test-Product.ps1: PASS
 Secret scan: PASS
 ```
+
+برای وضعیت فعلی، release evidence و repository checks جاری ملاک هستند.

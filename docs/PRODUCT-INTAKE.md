@@ -1,10 +1,12 @@
 # M0 Product Intake — Historical Baseline
 
-> This document records the original M0 intake decision. It is a historical product baseline, not the current repository-status page.
+> **Historical document.** This file records the original M0 intake decision and must not be used as AvaYar's current product-status page.
 >
-> Current engineering status: **M2 — executable foundation**. See [`docs/ava/m2/MVP_STATUS.md`](./ava/m2/MVP_STATUS.md).
+> Current product authority: **AvaYar 0.6.0 Stable**, released from source SHA `20d9da845c32e9873d332fb12192b38521d21232`. See the repository [`README.md`](../README.md) and the canonical [Stable release](https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0).
+>
+> The M0/M2 status language below is retained as engineering provenance.
 
-## Current context
+## Historical M0 context
 
 ```text
 PARENT-BRAND: Farsio - فارسیو
@@ -16,6 +18,8 @@ PUBLIC-PRODUCT-RELEASE: NOT YET
 PRODUCTION: NOT LAUNCHED
 ```
 
+The block above describes the historical early-stage context, not the current Stable 0.6.0 product state.
+
 ## Historical M0 decision
 
 ```text
@@ -26,7 +30,7 @@ M0-PUBLICATION: BLOCKED
 M0-PRODUCTION: BLOCKED
 ```
 
-The `NOT BUILDABLE AS PROVIDED` statement above refers to the **initial M0 blueprint input**. It does not describe the current repository: M1 and M2 work later established an executable runtime foundation, validation tooling and documented architecture.
+The `NOT BUILDABLE AS PROVIDED` statement above refers to the **initial M0 blueprint input**. It does not describe the current repository: later milestones established the executable runtime, extension, provider integrations, validation tooling and the accepted Stable 0.6.0 release.
 
 ## Problem
 
@@ -65,4 +69,4 @@ A browser-oriented product can extract the main content of a page, translate or 
 - Privacy flow and third-party processing documented.
 - Required M1 file inventory completed.
 
-For current implementation evidence, use the versioned milestone documents under [`docs/ava/`](./ava/).
+For current product truth, use [`README.md`](../README.md) and the Stable release. For milestone history, use the versioned documents under [`docs/ava/`](./ava/).
