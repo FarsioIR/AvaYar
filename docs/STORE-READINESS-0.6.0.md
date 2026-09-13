@@ -2,15 +2,20 @@
 
 Tracking: Issue #61
 
-This document is the release contract for moving AvaYar from the verified `0.6.0 preview-3` prerelease to stable `0.6.0`.
+> **Release-state note:** this document was written as the pre-release contract for promotion from `0.6.0 preview-3` to Stable `0.6.0`. Stable 0.6.0 has since been published from source SHA `20d9da845c32e9873d332fb12192b38521d21232`. The release contract below is retained as acceptance provenance; statements phrased as “before stable release” are historical gates, not current blockers.
+>
+> Canonical current product status: [`README.md`](../README.md) · [Stable release](https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0)
+
+This document is the release contract that governed moving AvaYar from the verified `0.6.0 preview-3` prerelease to stable `0.6.0`.
 
 ## Product baseline
 
 - Browser package: Manifest V3
 - Browsers: Google Chrome and Microsoft Edge
 - Canonical product page: `https://farsio.ir/fa/products/avayar`
-- Current validated online runtime: `https://avayar-runtime-preview.amotef.workers.dev`
-- Stable publication is not claimed until the complete acceptance checklist is closed.
+- Validated runtime lineage: `https://avayar-runtime-preview.amotef.workers.dev`
+- Stable release: `avayar-v0.6.0`
+- Accepted source SHA: `20d9da845c32e9873d332fb12192b38521d21232`
 
 ## Permission rationale
 
@@ -42,7 +47,7 @@ The extension must not claim that all processing is local. Store privacy disclos
 
 ## Stable artifact gates
 
-Before stable release:
+The Stable 0.6.0 promotion required:
 
 - `npm run check` PASS
 - `npm run check:store-readiness` PASS
@@ -57,7 +62,7 @@ Before stable release:
 
 ## Manual acceptance matrix
 
-Both Chrome and Edge must be checked from the exact final package:
+Chrome/Edge acceptance for the exact final package covered:
 
 - install/load succeeds
 - canonical AvaYar icon and branding render correctly
@@ -86,8 +91,8 @@ Chrome Web Store and Microsoft Edge Add-ons listing material must remain factual
 - canonical product/support URL under `farsio.ir`
 - approved AvaYar brand assets only
 
-Store submission/publication is a separate deliberate step. Repository readiness must never be presented as proof that either store has approved or published AvaYar.
+Store submission/publication is a separate deliberate step. Repository readiness and the GitHub Stable release must never be presented as proof that either browser store has approved or published AvaYar.
 
 ## Release provenance
 
-Stable `0.6.0` may be tagged and published only from the exact commit whose CI, package validation and manual acceptance evidence are recorded in Issue #61. Farsio AvaYar Release Notes must then be updated to the same stable version/date and provenance.
+Stable `0.6.0` was published from accepted source SHA `20d9da845c32e9873d332fb12192b38521d21232` after the release acceptance evidence associated with Issue #61. Current product truth should remain synchronized with the canonical Farsio AvaYar product page and release notes.
