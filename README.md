@@ -12,90 +12,85 @@ Persian-first web reading, translation, summarization and text-to-speech workflo
 
 [Product page](https://farsio.ir/fa/products/avayar) ·
 [Farsio](https://farsio.ir) ·
-[M2 architecture](./docs/ava/m2/ARCHITECTURE.md) ·
-[M2 status](./docs/ava/m2/MVP_STATUS.md)
+[Stable release 0.6.0](https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0) ·
+[Store readiness](./docs/STORE-READINESS-0.6.0.md)
 
 </div>
 
 ---
 
-## What AvaYar is
+## Current product status
 
-**AvaYar (آوایار)** is a Persian-first reading and listening product from **Farsio - فارسیو**.
-
-The product direction is to help Persian-speaking users consume web content by extracting the main content, translating non-Persian text into fluent Persian when needed, optionally summarizing it, and reading the Persian result aloud.
-
-AvaYar is currently an **engineering foundation**, not a production release. The repository contains the executable M2 browser shell, tests, build tooling and documented provider boundaries.
-
-## Current status
+AvaYar is a **public Stable 0.6.0 release** from **Farsio - فارسیو**.
 
 | Area | Current state |
 |---|---|
-| Product | Discovery / Pre-MVP |
-| Engineering milestone | **M2 — executable foundation** |
-| Repository visibility | **Public** |
-| Package version | `0.2.0` |
-| Node.js | `>=22` |
-| Public product release | Not yet |
-| Production | Not launched |
-| Browser Store publication | Not part of the current M2 milestone |
+| Product | **Stable** |
+| Current version | **0.6.0** |
+| Accepted source SHA | `20d9da845c32e9873d332fb12192b38521d21232` |
+| Release | [`avayar-v0.6.0`](https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0) |
+| Supported browsers | Google Chrome / Microsoft Edge |
+| Package | Manifest V3 |
+| Repository visibility | Public |
+| Browser Store publication | Separate distribution step; not implied by repository readiness |
 
-The current repository state intentionally distinguishes implemented capabilities from future product claims.
+The Stable 0.6.0 release is the canonical current product authority. Older M0–M8 milestone documents remain in this repository as engineering history and must not be interpreted as the current product status.
 
-## Implemented in M2
+## Stable 0.6.0 capabilities
 
-The M2 executable foundation currently includes:
+The accepted Stable release includes:
 
-- Persian text input.
-- Persian/non-Persian language detection using a lightweight heuristic.
-- Full-text Persian listening flow.
-- Deterministic local summary mode.
-- Browser speech playback through the Web Speech API when speech synthesis is available.
-- Play, pause, resume and stop controls.
-- Playback-rate control.
-- Build, lint, unit-test and smoke-test tooling.
-- GitHub Actions validation.
+- Persian-first webpage reading.
+- Full Text and Summary modes.
+- English → Persian preparation.
+- Real Persian neural TTS.
+- Female Persian voice: **Sulafat**.
+- Male Persian voice: **Iapetus**.
+- Progressive audio playback for faster first-audio startup.
+- Play / Pause / Resume / Stop controls.
+- Chrome / Edge Manifest V3 extension packaging.
+- Canonical AvaYar branding under Farsio.
 
-## Deliberate M2 boundaries
+Real-browser acceptance for the Stable package includes Summary and Full Text flows with both female and male voice paths, plus progressive playback and playback controls.
 
-AvaYar does **not** present unfinished capabilities as complete:
+## Release provenance
 
-- Production-grade non-Persian → Persian translation is not connected yet; the provider boundary is explicit.
-- Automatic extraction from arbitrary external webpages is not connected to the standalone M2 shell yet.
-- Browser Web Speech APIs do not provide standardized voice-gender metadata, so a guaranteed male/female Persian voice pair is not claimed.
-- M2 is the first executable foundation, not the complete AvaYar MVP.
+Canonical Stable release:
 
-See [M2 MVP status](./docs/ava/m2/MVP_STATUS.md) for the evidence-backed capability matrix.
+- Tag: `avayar-v0.6.0`
+- Accepted source SHA: `20d9da845c32e9873d332fb12192b38521d21232`
+- Accepted ZIP SHA-256: `b3cb4265b5d9bb13e5bc0d6f9f726ca716270a0d692d29706f4e7596077ed375`
+- Accepted preview lineage: `avayar-v0.6.0-preview-9`
 
-## Architecture
+The Stable ZIP is the browser-accepted package promoted from the accepted Preview 9 artifact.
 
-M2 uses small ES modules with no third-party runtime dependency:
+## Runtime and privacy boundaries
 
-```text
-src/
-├── app.mjs
-├── core/
-│   ├── language.mjs
-│   ├── pipeline.mjs
-│   └── summary.mjs
-└── providers/
-    ├── browser-speech.mjs
-    └── unconfigured-translation.mjs
-```
+AvaYar uses explicit browser and runtime boundaries:
 
-Supporting engineering surfaces include:
+- `activeTab`: access only to the tab the user invokes AvaYar on.
+- `scripting`: runs the extraction bridge after explicit user action.
+- `sidePanel`: renders the AvaYar reading interface.
+- `storage`: persists local extension preferences such as voice and mode state.
+- Optional webpage host access is used for user-invoked reading across arbitrary pages.
+- Webpage text may be transmitted to the configured AvaYar HTTPS runtime for requested translation and speech operations.
+- Provider credentials remain server-side and must never be embedded in the extension package.
+- The product must not be described as fully local-only.
 
-- `scripts/` — development, lint, build and smoke tooling.
-- `test/` — Node built-in tests.
-- `.github/workflows/ci.yml` — continuous validation.
-- `docs/ava/m2/` — architecture, check evidence and current MVP status.
+See [`docs/STORE-READINESS-0.6.0.md`](./docs/STORE-READINESS-0.6.0.md) and [`docs/SECURITY-BASELINE.md`](./docs/SECURITY-BASELINE.md).
+
+## Historical engineering milestones
+
+The folders under [`docs/ava/`](./docs/ava/) preserve milestone evidence from M0 onward. In particular, the M2 documents describe the earlier executable-foundation stage and are **historical** relative to Stable 0.6.0.
+
+Do not use an older milestone status such as `Discovery / Pre-MVP`, package `0.2.0`, `MISSING PROVIDER`, or `NOT YET CONNECTED` as a statement about the current Stable release.
 
 ## Local validation
 
 Requirements:
 
 ```text
-Node.js >= 22
+Node.js >= 22.21.0
 ```
 
 Run the complete repository check:
@@ -104,40 +99,13 @@ Run the complete repository check:
 npm run check
 ```
 
-The check pipeline is defined as:
+The current repository validation pipeline includes lint, tests, build, smoke, extension validation and store-readiness checks.
 
-```text
-lint → test → build → smoke
-```
+For production-extension validation, use the existing production extension scripts defined in `package.json`.
 
-For the product-specific PowerShell gate:
+## Distribution status
 
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\Test-Product.ps1
-```
-
-## Security and privacy baseline
-
-AvaYar is designed around explicit security boundaries:
-
-- No API keys, tokens or credentials belong in source control.
-- Sending webpage text to external AI/TTS providers requires clear user consent and privacy disclosure.
-- Browser permissions should remain minimal and justified.
-- Dynamic content must use safe DOM handling rather than unsafe HTML injection.
-- Sensitive page content and credentials must not be logged.
-- External network paths require HTTPS and controlled error handling.
-
-See [Security Baseline](./docs/SECURITY-BASELINE.md).
-
-## Engineering roadmap
-
-The next implementation work should focus on evidence-backed product capabilities:
-
-1. Connect production-grade translation/provider boundaries.
-2. Connect webpage content extraction to the tested pipeline.
-3. Preserve the existing privacy and permission model.
-4. Validate Persian speech behavior across supported browser environments.
-5. Advance toward a private beta only after the relevant product/security gates pass.
+Stable 0.6.0 is a public GitHub release with a Chrome/Edge package. Chrome Web Store and Microsoft Edge Add-ons submission/publication are separate deliberate distribution steps and must not be inferred from the GitHub release alone.
 
 ## Product and brand
 
@@ -148,6 +116,11 @@ The next implementation work should focus on evidence-backed product capabilitie
 - **Canonical brand mark:** [`assets/brand/avayar-flat.svg`](./assets/brand/avayar-flat.svg)
 - **Product page:** https://farsio.ir/fa/products/avayar
 - **Repository:** https://github.com/FarsioIR/AvaYar
+- **Stable release:** https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0
+
+## Roadmap
+
+Near-term work should focus on quality, compatibility, browser-store distribution readiness, resilience and continued validation of the released capabilities. Future work remains non-promissory until source-backed implementation and acceptance evidence exists.
 
 ---
 
