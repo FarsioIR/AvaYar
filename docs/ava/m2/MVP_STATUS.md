@@ -1,5 +1,9 @@
 # Ava M2 — MVP Status
 
+> **Historical milestone document.** This file describes the M2 executable-foundation state and is preserved as engineering provenance.
+>
+> It is **not** the current AvaYar product-status page. Current authority is **AvaYar 0.6.0 Stable**, released from source SHA `20d9da845c32e9873d332fb12192b38521d21232`. See [`../../../README.md`](../../../README.md) and the [Stable release](https://github.com/FarsioIR/AvaYar/releases/tag/avayar-v0.6.0).
+
 | Product capability | M2 status | Evidence |
 |---|---|---|
 | Text input | IMPLEMENTED | Browser textarea and pipeline validation |
@@ -17,6 +21,6 @@
 
 ## M2 definition
 
-M2 is the first **executable foundation** milestone, not the complete Ava MVP.
+M2 was the first **executable foundation** milestone, not the complete Ava MVP.
 
-The next implementation milestone should connect production-grade providers and web extraction while preserving the tested pipeline contracts introduced here.
+The statements above intentionally preserve the M2-era capability snapshot. Later milestones connected the production-grade flows that culminated in the accepted Stable 0.6.0 release; therefore M2 statuses such as `MISSING PROVIDER`, `NOT YET GUARANTEED`, and `NOT YET CONNECTED` must not be reused as current product claims.
